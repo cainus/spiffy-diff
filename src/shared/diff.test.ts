@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDiff } from './diff'
+import { filePatch, parseDiff } from './diff'
 
 const oneHunk = `diff --git a/src/a.ts b/src/a.ts
 index 1111111..2222222 100644
@@ -93,5 +93,46 @@ Binary files a/logo.png and b/logo.png differ
       'src/a.ts:h1',
       'src/b.ts:h2',
     ])
+  })
+})
+
+describe('filePatch', () => {
+  const two = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
+-one
++ONE
+@@ -9 +9 @@
+-nine
++NINE
+`
+
+  it('builds a patch for the whole file with file headers', () => {
+    const [file] = parseDiff(two)
+
+    expect(filePatch(file!)).toBe(
+      'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-one\n+ONE\n@@ -9 +9 @@\n-nine\n+NINE\n',
+    )
+  })
+
+  it('builds a patch for only some hunks', () => {
+    const [file] = parseDiff(two)
+
+    expect(filePatch(file!, ['h2'])).toBe(
+      'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -9 +9 @@\n-nine\n+NINE\n',
+    )
+  })
+
+  it('uses /dev/null for the missing side of added and deleted files', () => {
+    const [added] = parseDiff(`diff --git a/n.ts b/n.ts
+new file mode 100644
+--- /dev/null
++++ b/n.ts
+@@ -0,0 +1 @@
++n
+`)
+
+    expect(filePatch(added!)).toContain('--- /dev/null\n+++ b/n.ts\n')
   })
 })

@@ -8,7 +8,8 @@ export interface PrRef {
   number: number
 }
 
-const PR_URL = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#].*)?$/
+const PR_URL =
+  /^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#].*)?$/
 
 export function parsePrUrl(input: string): PrRef | null {
   const m = PR_URL.exec(input.trim())

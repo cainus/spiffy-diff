@@ -11,13 +11,19 @@ export const modelSummarySchema = z.object({
   goals: z
     .array(
       z.object({
-        title: z.string().describe('A short imperative title, for example "Add retry to the payment client".'),
-        description: z.string().describe('Why this goal exists and what it does, in 2-4 sentences.'),
+        title: z
+          .string()
+          .describe('A short imperative title, for example "Add retry to the payment client".'),
+        description: z
+          .string()
+          .describe('Why this goal exists and what it does, in 2-4 sentences.'),
         changes: z.array(
           z.object({
             title: z.string().describe('A short title for one related set of code edits.'),
             description: z.string().describe('What this change does and why, in 1-3 sentences.'),
-            hunkIds: z.array(z.string()).describe('The IDs of the hunks that implement this change.'),
+            hunkIds: z
+              .array(z.string())
+              .describe('The IDs of the hunks that implement this change.'),
           }),
         ),
       }),
@@ -58,14 +64,22 @@ interface DraftGoal {
 
 function changesByFile(files: DiffFile[], keep: (hunkId: string) => boolean): Omit<Change, 'id'>[] {
   return files
-    .map((f) => ({ title: f.path, description: '', hunkIds: f.hunks.map((h) => h.id).filter(keep) }))
+    .map((f) => ({
+      title: f.path,
+      description: '',
+      hunkIds: f.hunks.map((h) => h.id).filter(keep),
+    }))
     .filter((c) => c.hunkIds.length > 0)
 }
 
 /** Turn the model answer into a summary that covers every hunk. See ADR 0002. */
 export function buildSummary(model: ModelSummary, files: DiffFile[]): Summary {
-  const noise = new Set(files.filter((f) => isNoise(f.path)).flatMap((f) => f.hunks.map((h) => h.id)))
-  const reviewable = new Set(files.flatMap((f) => f.hunks.map((h) => h.id)).filter((id) => !noise.has(id)))
+  const noise = new Set(
+    files.filter((f) => isNoise(f.path)).flatMap((f) => f.hunks.map((h) => h.id)),
+  )
+  const reviewable = new Set(
+    files.flatMap((f) => f.hunks.map((h) => h.id)).filter((id) => !noise.has(id)),
+  )
   const covered = new Set<string>()
 
   const drafts: DraftGoal[] = model.goals.map((g) => ({

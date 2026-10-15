@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { DiffFile } from '@shared/diff'
 import { isNoise } from '@shared/noise'
 import type { LoadedSource } from '@shared/source'
+import { STE_RULES } from './style'
 import { buildSummary, modelSummarySchema, type ModelSummary, type Summary } from '@shared/summary'
 
 export type PartialSummary = DeepPartial<ModelSummary>
@@ -25,7 +26,8 @@ Put the most important goal first. Use few goals: one to five for most changes.
 For each goal, list the changes. A change is one related set of code edits that serves the goal.
 Attach hunks to changes with their hunk IDs, for example "h3". Use only hunk IDs that you see.
 Attach every hunk to at least one change.
-Write short, plain sentences. Use the present tense and the active voice.`
+
+${STE_RULES}`
 
 function reviewable(files: DiffFile[]): DiffFile[] {
   return files.filter((f) => !isNoise(f.path))
@@ -64,7 +66,11 @@ const fileDigestSchema = z.object({
   hunks: z.array(z.object({ id: z.string(), what: z.string().describe('One sentence.') })),
 })
 
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
   const out: R[] = new Array(items.length)
   let next = 0
   const worker = async (): Promise<void> => {
@@ -82,6 +88,7 @@ async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promis
   const digests = await mapLimit(files, opts.concurrency ?? 4, async (f) => {
     const { output } = await generateText({
       model: opts.model,
+      system: STE_RULES,
       output: Output.object({ schema: fileDigestSchema }),
       abortSignal: opts.abortSignal,
       prompt: `${sourceIntro(source)}\n\nSummarize the edits in one file. Describe each hunk in one sentence.\n\n${promptHunks([f])}`,

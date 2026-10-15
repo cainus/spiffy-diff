@@ -46,10 +46,25 @@ export async function loadPrSource(url: string, gh: GhRunner): Promise<LoadedSou
   }
 }
 
-export async function findOpenPr(cwd: string, branch: string, gh: GhRunner): Promise<OpenPr | null> {
+export async function findOpenPr(
+  cwd: string,
+  branch: string,
+  gh: GhRunner,
+): Promise<OpenPr | null> {
   try {
     const out = await gh(
-      ['pr', 'list', '--head', branch, '--state', 'open', '--limit', '1', '--json', 'url,title,body,baseRefName'],
+      [
+        'pr',
+        'list',
+        '--head',
+        branch,
+        '--state',
+        'open',
+        '--limit',
+        '1',
+        '--json',
+        'url,title,body,baseRefName',
+      ],
       cwd,
     )
     return (JSON.parse(out) as OpenPr[])[0] ?? null

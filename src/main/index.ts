@@ -1,5 +1,11 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
+import { registerIpc } from './ipc'
+import { applyLoginShellPath } from './shell-path'
+
+applyLoginShellPath()
+
+let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -17,6 +23,10 @@ function createWindow(): void {
     },
   })
 
+  mainWindow = win
+  win.on('closed', () => {
+    mainWindow = null
+  })
   win.on('ready-to-show', () => win.show())
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
@@ -31,6 +41,7 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  registerIpc(() => mainWindow)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

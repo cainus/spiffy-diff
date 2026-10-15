@@ -19,7 +19,12 @@ function streamJson(json: string) {
         { type: 'text-start' as const, id: 't' },
         ...parts.map((delta) => ({ type: 'text-delta' as const, id: 't', delta })),
         { type: 'text-end' as const, id: 't' },
-        { type: 'finish' as const, finishReason: { unified: 'stop' as const, raw: undefined }, logprobs: undefined, usage },
+        {
+          type: 'finish' as const,
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          logprobs: undefined,
+          usage,
+        },
       ],
     }),
   }
@@ -107,7 +112,9 @@ describe('choosePlan', () => {
 
 describe('summarize', () => {
   it('streams partial goals and returns a summary that covers every hunk', async () => {
-    const model = new MockLanguageModelV4({ doStream: async () => streamJson(JSON.stringify(answer)) })
+    const model = new MockLanguageModelV4({
+      doStream: async () => streamJson(JSON.stringify(answer)),
+    })
     const partialTitles: string[] = []
 
     const summary = await summarize(source, {
@@ -115,9 +122,24 @@ describe('summarize', () => {
       onPartial: (p) => partialTitles.push(p.goals?.[0]?.title ?? ''),
     })
 
-    expect(summary.goals.map((g) => g.title)).toEqual(['Retry failed calls', 'Generated & lockfiles'])
+    expect(summary.goals.map((g) => g.title)).toEqual([
+      'Retry failed calls',
+      'Generated & lockfiles',
+    ])
     expect(partialTitles.some((t) => t.length > 0 && t !== 'Retry failed calls')).toBe(true)
     expect(JSON.stringify(model.doStreamCalls[0]!.prompt)).toContain('Calls fail sometimes.')
+  })
+
+  it('tells the model to write in ASD-STE100', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () => streamJson(JSON.stringify(answer)),
+    })
+
+    await summarize(source, { model })
+
+    const prompt = JSON.stringify(model.doStreamCalls[0]!.prompt)
+    expect(prompt).toContain('ASD-STE100')
+    expect(prompt).toContain('active voice')
   })
 
   it('summarizes each file first when the hunks do not fit, then groups the file summaries', async () => {

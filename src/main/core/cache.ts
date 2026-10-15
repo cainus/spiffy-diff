@@ -14,7 +14,11 @@ export async function readCachedSummary(home: string, key: string): Promise<Summ
   }
 }
 
-export async function writeCachedSummary(home: string, key: string, summary: Summary): Promise<void> {
+export async function writeCachedSummary(
+  home: string,
+  key: string,
+  summary: Summary,
+): Promise<void> {
   await mkdir(join(home, 'summaries'), { recursive: true })
   await writeFile(file(home, key), JSON.stringify(summary))
 }

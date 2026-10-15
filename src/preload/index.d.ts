@@ -1,7 +1,7 @@
-import type { SpiffyApi } from './index'
+import type { SpiffyBridge } from '@shared/ipc'
 
 declare global {
   interface Window {
-    spiffy: SpiffyApi
+    spiffy: SpiffyBridge
   }
 }

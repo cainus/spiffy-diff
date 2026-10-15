@@ -19,14 +19,18 @@ const summary: Summary = {
       kind: 'model',
       title: 'Retry failed calls',
       description: 'Calls fail.',
-      changes: [{ id: 'g1.c1', title: 'Wrap the call', description: 'Use retry.', hunkIds: ['h1'] }],
+      changes: [
+        { id: 'g1.c1', title: 'Wrap the call', description: 'Use retry.', hunkIds: ['h1'] },
+      ],
     },
   ],
 }
 
 describe('describeFocus', () => {
   it('names the whole source at the top level', () => {
-    expect(describeFocus({ level: 'source' }, summary, files)).toBe('The user looks at the whole source.')
+    expect(describeFocus({ level: 'source' }, summary, files)).toBe(
+      'The user looks at the whole source.',
+    )
   })
 
   it('names the goal and its description at the goal level', () => {

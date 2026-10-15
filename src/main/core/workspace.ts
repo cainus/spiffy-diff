@@ -36,7 +36,15 @@ export async function ensureWorkspace(req: WorkspaceRequest): Promise<string> {
     repo = join(req.home, 'repos', slug)
     if (!existsSync(repo)) {
       await mkdir(join(req.home, 'repos'), { recursive: true })
-      await git(req.home, 'clone', '--quiet', '--filter=blob:none', '--no-checkout', req.cloneUrl, repo)
+      await git(
+        req.home,
+        'clone',
+        '--quiet',
+        '--filter=blob:none',
+        '--no-checkout',
+        req.cloneUrl,
+        repo,
+      )
     }
   }
 

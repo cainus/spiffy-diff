@@ -52,7 +52,9 @@ describe('loadPrSource', () => {
   it('rejects input that is not a GitHub PR URL before it calls gh', async () => {
     const gh = fakeGh({})
 
-    await expect(loadPrSource('https://example.com/x', gh)).rejects.toThrow(/not a GitHub pull request URL/)
+    await expect(loadPrSource('https://example.com/x', gh)).rejects.toThrow(
+      /not a GitHub pull request URL/,
+    )
     expect(gh.calls).toEqual([])
   })
 })
@@ -63,7 +65,12 @@ describe('findOpenPr', () => {
       'pr list': JSON.stringify([{ url: 'u', title: 't', body: 'b', baseRefName: 'main' }]),
     })
 
-    expect(await findOpenPr('/repo', 'feature', gh)).toEqual({ url: 'u', title: 't', body: 'b', baseRefName: 'main' })
+    expect(await findOpenPr('/repo', 'feature', gh)).toEqual({
+      url: 'u',
+      title: 't',
+      body: 'b',
+      baseRefName: 'main',
+    })
     expect(gh.calls[0]).toEqual(expect.arrayContaining(['--head', 'feature', '--state', 'open']))
   })
 

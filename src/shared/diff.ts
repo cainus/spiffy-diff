@@ -99,3 +99,12 @@ export function parseDiff(text: string): DiffFile[] {
   closeHunk()
   return files
 }
+
+/** A patch with file headers, for the diff renderer. Give `hunkIds` to keep only some hunks. */
+export function filePatch(file: DiffFile, hunkIds?: string[]): string {
+  const hunks = hunkIds ? file.hunks.filter((h) => hunkIds.includes(h.id)) : file.hunks
+  const oldName = file.status === 'added' ? '/dev/null' : `a/${file.oldPath}`
+  const newName = file.status === 'deleted' ? '/dev/null' : `b/${file.path}`
+  const header = `diff --git a/${file.oldPath} b/${file.path}\n--- ${oldName}\n+++ ${newName}\n`
+  return header + hunks.map((h) => `${h.patch}\n`).join('')
+}

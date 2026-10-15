@@ -25,7 +25,15 @@ const source: LoadedSource = {
 
 const summary: Summary = {
   overview: 'Adds retry to the client.',
-  goals: [{ id: 'g1', kind: 'model', title: 'Retry failed calls', description: 'Calls fail.', changes: [] }],
+  goals: [
+    {
+      id: 'g1',
+      kind: 'model',
+      title: 'Retry failed calls',
+      description: 'Calls fail.',
+      changes: [],
+    },
+  ],
 }
 
 const messages: UIMessage[] = [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Why?' }] }]
@@ -46,14 +54,25 @@ describe('chatStream', () => {
             { type: 'text-delta', id: 't', delta: 'Because ' },
             { type: 'text-delta', id: 't', delta: 'calls fail.' },
             { type: 'text-end', id: 't' },
-            { type: 'finish', finishReason: { unified: 'stop', raw: undefined }, logprobs: undefined, usage },
+            {
+              type: 'finish',
+              finishReason: { unified: 'stop', raw: undefined },
+              logprobs: undefined,
+              usage,
+            },
           ],
         }),
       }),
     })
 
     const chunks = await collect(
-      await chatStream({ model, source, summary, messages, focus: { level: 'goal', goalId: 'g1' } }),
+      await chatStream({
+        model,
+        source,
+        summary,
+        messages,
+        focus: { level: 'goal', goalId: 'g1' },
+      }),
     )
 
     const prompt = JSON.stringify(model.doStreamCalls[0]!.prompt)
@@ -61,6 +80,7 @@ describe('chatStream', () => {
     expect(prompt).toContain('Adds retry to the client.')
     expect(prompt).toContain('goal \\"Retry failed calls\\"')
     expect(prompt).toContain('Why?')
+    expect(prompt).toContain('ASD-STE100')
     const text = chunks.flatMap((c) => (c.type === 'text-delta' ? [c.delta] : [])).join('')
     expect(text).toBe('Because calls fail.')
   })

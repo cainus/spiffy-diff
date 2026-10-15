@@ -27,7 +27,11 @@ function file(path: string, ...ids: string[]): DiffFile {
   }
 }
 
-const files = [file('src/a.ts', 'h1', 'h2'), file('src/b.ts', 'h3'), file('package-lock.json', 'h4')]
+const files = [
+  file('src/a.ts', 'h1', 'h2'),
+  file('src/b.ts', 'h3'),
+  file('package-lock.json', 'h4'),
+]
 
 describe('buildSummary', () => {
   it('gives stable IDs to goals and changes and keeps the model text', () => {
@@ -81,7 +85,13 @@ describe('buildSummary', () => {
     const summary = buildSummary(
       {
         overview: '',
-        goals: [{ title: 'G', description: '', changes: [{ title: 'c', description: '', hunkIds: ['h2'] }] }],
+        goals: [
+          {
+            title: 'G',
+            description: '',
+            changes: [{ title: 'c', description: '', hunkIds: ['h2'] }],
+          },
+        ],
       },
       files,
     )
@@ -99,7 +109,11 @@ describe('buildSummary', () => {
       {
         overview: '',
         goals: [
-          { title: 'G', description: '', changes: [{ title: 'c', description: '', hunkIds: ['h1', 'h2', 'h3', 'h4'] }] },
+          {
+            title: 'G',
+            description: '',
+            changes: [{ title: 'c', description: '', hunkIds: ['h1', 'h2', 'h3', 'h4'] }],
+          },
         ],
       },
       files,
@@ -118,8 +132,16 @@ describe('buildSummary', () => {
       {
         overview: '',
         goals: [
-          { title: 'empty', description: '', changes: [{ title: 'x', description: '', hunkIds: ['nope'] }] },
-          { title: 'full', description: '', changes: [{ title: 'y', description: '', hunkIds: ['h1', 'h2', 'h3'] }] },
+          {
+            title: 'empty',
+            description: '',
+            changes: [{ title: 'x', description: '', hunkIds: ['nope'] }],
+          },
+          {
+            title: 'full',
+            description: '',
+            changes: [{ title: 'y', description: '', hunkIds: ['h1', 'h2', 'h3'] }],
+          },
         ],
       },
       files,
@@ -138,8 +160,16 @@ describe('hunkOwners', () => {
       {
         overview: '',
         goals: [
-          { title: 'A', description: '', changes: [{ title: 'a', description: '', hunkIds: ['h1', 'h2'] }] },
-          { title: 'B', description: '', changes: [{ title: 'b', description: '', hunkIds: ['h2', 'h3'] }] },
+          {
+            title: 'A',
+            description: '',
+            changes: [{ title: 'a', description: '', hunkIds: ['h1', 'h2'] }],
+          },
+          {
+            title: 'B',
+            description: '',
+            changes: [{ title: 'b', description: '', hunkIds: ['h2', 'h3'] }],
+          },
         ],
       },
       files,

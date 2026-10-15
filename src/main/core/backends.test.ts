@@ -7,7 +7,9 @@ describe('claudeSettings', () => {
 
     expect(s.cwd).toBe('/ws')
     expect(s.allowedTools).toEqual(['Read', 'Grep', 'Glob', 'LS'])
-    expect(s.disallowedTools).toEqual(expect.arrayContaining(['Write', 'Edit', 'Bash', 'NotebookEdit', 'WebFetch']))
+    expect(s.disallowedTools).toEqual(
+      expect.arrayContaining(['Write', 'Edit', 'Bash', 'NotebookEdit', 'WebFetch']),
+    )
     expect(s.settingSources).toEqual([])
     expect(s.mcpServers).toEqual({})
   })
@@ -26,7 +28,12 @@ describe('codexSettings', () => {
 
 describe('pickCodexModel', () => {
   it('uses the model that Codex marks as default', () => {
-    expect(pickCodexModel([{ id: 'a', isDefault: false }, { id: 'b', isDefault: true }])).toBe('b')
+    expect(
+      pickCodexModel([
+        { id: 'a', isDefault: false },
+        { id: 'b', isDefault: true },
+      ]),
+    ).toBe('b')
   })
 
   it('uses the first visible model when no model is the default', () => {

@@ -48,9 +48,9 @@ describe('IpcChatTransport', () => {
       () => ({ sessionId: 's1', backend: 'claude', focus: { level: 'source' } }),
     )
 
-    await expect(collect(await transport.sendMessages({ ...base, abortSignal: undefined }))).rejects.toThrow(
-      'Claude is not logged in',
-    )
+    await expect(
+      collect(await transport.sendMessages({ ...base, abortSignal: undefined })),
+    ).rejects.toThrow('Claude is not logged in')
   })
 
   it('cancels the request in main when the chat aborts', async () => {

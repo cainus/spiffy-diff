@@ -9,7 +9,16 @@ export function claudeSettings(cwd: string): ClaudeCodeSettings {
     cwd,
     permissionMode: 'default',
     allowedTools: ['Read', 'Grep', 'Glob', 'LS'],
-    disallowedTools: ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch', 'Task'],
+    disallowedTools: [
+      'Write',
+      'Edit',
+      'MultiEdit',
+      'NotebookEdit',
+      'Bash',
+      'WebFetch',
+      'WebSearch',
+      'Task',
+    ],
     settingSources: [],
     mcpServers: {},
   }

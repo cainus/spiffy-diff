@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { basename } from 'node:path'
 import { promisify } from 'node:util'
 import { parseDiff } from '@shared/diff'
+import type { BranchList } from '@shared/ipc'
 import type { LoadedSource } from '@shared/source'
 
 const exec = promisify(execFile)
@@ -79,4 +80,12 @@ export async function loadBranchSource(
     dirtyHash: dirty ? createHash('sha1').update(dirty).digest('hex').slice(0, 12) : null,
     files: parseDiff(diff),
   }
+}
+
+export async function listBranches(cwd: string): Promise<BranchList> {
+  const current = await gitLine(cwd, 'rev-parse', '--abbrev-ref', 'HEAD')
+  const all = (await gitLine(cwd, 'branch', '--format=%(refname:short)', '--sort=-committerdate'))
+    .split('\n')
+    .filter(Boolean)
+  return { current, branches: [current, ...all.filter((b) => b !== current)] }
 }

@@ -10,7 +10,13 @@ function git(cwd: string, ...args: string[]): string {
     cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
-    env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 't',
+      GIT_AUTHOR_EMAIL: 't@t',
+      GIT_COMMITTER_NAME: 't',
+      GIT_COMMITTER_EMAIL: 't@t',
+    },
   }).trim()
 }
 
@@ -36,7 +42,13 @@ beforeEach(() => {
 
 describe('ensureWorkspace', () => {
   it('clones the repo when there is no local copy and checks out the head in a worktree', async () => {
-    const dir = await ensureWorkspace({ repo: 'o/r', headSha, cloneUrl: origin, localRepo: null, home })
+    const dir = await ensureWorkspace({
+      repo: 'o/r',
+      headSha,
+      cloneUrl: origin,
+      localRepo: null,
+      home,
+    })
 
     expect(readFileSync(join(dir, 'a.txt'), 'utf8')).toBe('hello pr\n')
     expect(existsSync(join(home, 'repos', 'o__r'))).toBe(true)
@@ -47,7 +59,14 @@ describe('ensureWorkspace', () => {
     git(root, 'clone', '-q', '--no-local', '--single-branch', '-b', 'main', origin, local)
     expect(() => git(local, 'cat-file', '-e', `${headSha}^{commit}`)).toThrow()
 
-    const dir = await ensureWorkspace({ repo: 'o/r', headSha, cloneUrl: origin, localRepo: local, home, fetchRefs: ['pr'] })
+    const dir = await ensureWorkspace({
+      repo: 'o/r',
+      headSha,
+      cloneUrl: origin,
+      localRepo: local,
+      home,
+      fetchRefs: ['pr'],
+    })
 
     expect(readFileSync(join(dir, 'a.txt'), 'utf8')).toBe('hello pr\n')
     expect(git(local, 'worktree', 'list')).toContain(dir)
@@ -55,8 +74,20 @@ describe('ensureWorkspace', () => {
   })
 
   it('reuses the worktree on the second call', async () => {
-    const first = await ensureWorkspace({ repo: 'o/r', headSha, cloneUrl: origin, localRepo: null, home })
-    const second = await ensureWorkspace({ repo: 'o/r', headSha, cloneUrl: origin, localRepo: null, home })
+    const first = await ensureWorkspace({
+      repo: 'o/r',
+      headSha,
+      cloneUrl: origin,
+      localRepo: null,
+      home,
+    })
+    const second = await ensureWorkspace({
+      repo: 'o/r',
+      headSha,
+      cloneUrl: origin,
+      localRepo: null,
+      home,
+    })
 
     expect(second).toBe(first)
   })

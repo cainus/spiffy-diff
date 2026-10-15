@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { defaultBranch, loadBranchSource, type PrLookup } from './git'
+import { defaultBranch, listBranches, loadBranchSource, type PrLookup } from './git'
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -58,7 +58,10 @@ describe('defaultBranch', () => {
 
 describe('loadBranchSource', () => {
   it('diffs the branch against its merge-base with the default branch', async () => {
-    const source = await loadBranchSource(repo, 'feature', { includeUncommitted: false, findPr: noPr })
+    const source = await loadBranchSource(repo, 'feature', {
+      includeUncommitted: false,
+      findPr: noPr,
+    })
 
     expect(source.baseSha).toBe(forkPoint)
     expect(source.headSha).toBe(git(repo, 'rev-parse', 'feature'))
@@ -72,7 +75,10 @@ describe('loadBranchSource', () => {
     git(repo, 'add', 'c.txt')
     writeFileSync(join(repo, 'a.txt'), 'one\nTWO\nTHREE\n')
 
-    const source = await loadBranchSource(repo, 'feature', { includeUncommitted: true, findPr: noPr })
+    const source = await loadBranchSource(repo, 'feature', {
+      includeUncommitted: true,
+      findPr: noPr,
+    })
 
     expect(source.files.map((f) => f.path).sort()).toEqual(['a.txt', 'c.txt'])
     expect(source.dirtyHash).toMatch(/^[0-9a-f]{12}$/)
@@ -81,7 +87,10 @@ describe('loadBranchSource', () => {
   it('ignores uncommitted changes when you do not ask for them', async () => {
     writeFileSync(join(repo, 'a.txt'), 'changed\n')
 
-    const source = await loadBranchSource(repo, 'feature', { includeUncommitted: false, findPr: noPr })
+    const source = await loadBranchSource(repo, 'feature', {
+      includeUncommitted: false,
+      findPr: noPr,
+    })
 
     expect(source.files[0]!.hunks[0]!.patch).toContain('+TWO')
     expect(source.files[0]!.hunks[0]!.patch).not.toContain('changed')
@@ -94,7 +103,12 @@ describe('loadBranchSource', () => {
     commit(repo, 'a.txt', 'ONE\nTWO\nthree\n')
     const findPr: PrLookup = async (_cwd, branch) =>
       branch === 'feature'
-        ? { url: 'https://github.com/o/r/pull/5', title: 'Uppercase two', body: 'Because.', baseRefName: 'release' }
+        ? {
+            url: 'https://github.com/o/r/pull/5',
+            title: 'Uppercase two',
+            body: 'Because.',
+            baseRefName: 'release',
+          }
         : null
 
     const source = await loadBranchSource(repo, 'feature', { includeUncommitted: false, findPr })
@@ -105,5 +119,11 @@ describe('loadBranchSource', () => {
       prUrl: 'https://github.com/o/r/pull/5',
       baseSha: releasePoint,
     })
+  })
+})
+
+describe('listBranches', () => {
+  it('lists local branches with the current branch first', async () => {
+    expect(await listBranches(repo)).toEqual({ current: 'feature', branches: ['feature', 'trunk'] })
   })
 })
