@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/renderer/src/components/ui/*.tsx",
+    "src/renderer/src/components/ai-elements/*.tsx"
+  ],
+  "project": ["src/**/*.{ts,tsx,css}"]
+}
