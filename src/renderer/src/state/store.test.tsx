@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useEffect } from 'react'
 import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SpiffyBridge } from '@shared/ipc'
@@ -18,9 +19,12 @@ const source: LoadedSource = {
   files: [],
 }
 
-let store: Store
+const held: { store?: Store } = {}
 function Probe() {
-  store = useStore()
+  const s = useStore()
+  useEffect(() => {
+    held.store = s
+  })
   return null
 }
 
@@ -40,11 +44,11 @@ describe('rerunChange', () => {
         <Probe />
       </StoreProvider>,
     )
-    await act(() => store.open({ kind: 'pr', url: 'https://github.com/o/r/pull/1' }))
+    await act(() => held.store!.open({ kind: 'pr', url: 'https://github.com/o/r/pull/1' }))
 
-    act(() => store.rerunChange('g1', 'g1.c1', 'detail'))
-    act(() => store.rerunChange('g1', 'g1.c1', 'detail'))
-    act(() => store.rerunChange('g1', 'g1.c2', 'detail'))
+    act(() => held.store!.rerunChange('g1', 'g1.c1', 'detail'))
+    act(() => held.store!.rerunChange('g1', 'g1.c1', 'detail'))
+    act(() => held.store!.rerunChange('g1', 'g1.c2', 'detail'))
 
     expect(window.spiffy.rerunChange).toHaveBeenCalledTimes(2)
   })
