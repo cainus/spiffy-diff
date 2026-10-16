@@ -118,6 +118,10 @@ const answer: ModelSummary = {
       changes: [{ title: 'Wrap the call', description: 'Use retry.', hunkIds: ['h1', 'h2'] }],
     },
   ],
+  hunkNotes: [
+    { hunkId: 'h1', note: 'Adds a backoff.' },
+    { hunkId: 'h2', note: 'Calls retry.' },
+  ],
 }
 
 describe('promptHunks', () => {
@@ -336,7 +340,7 @@ describe('summarize', () => {
           hunks: [{ id: file === 'retry' ? 'h1' : 'h2', what: `${file} hunk` }],
         })
       },
-      doStream: async () => streamJson(JSON.stringify(answer)),
+      doStream: async () => streamJson(JSON.stringify({ ...answer, hunkNotes: undefined })),
     })
 
     const events: SummaryProgress[] = []
@@ -358,5 +362,83 @@ describe('summarize', () => {
     expect(reducePrompt).toContain('[h2] client hunk')
     expect(summary.goals[0]!.changes[0]!.hunkIds).toEqual(['h1', 'h2'])
     expect(summary.hunkNotes).toEqual({ h1: 'retry hunk', h2: 'client hunk' })
+  })
+
+  describe('missing hunk notes', () => {
+    const withoutH2 = { ...answer, hunkNotes: [{ hunkId: 'h1', note: 'Adds a backoff.' }] }
+
+    it('asks for the notes of the hunks that the summary left without a note, one file at a time', async () => {
+      const model = new MockLanguageModelV4({
+        doStream: async () => streamJson(JSON.stringify(withoutH2)),
+        doGenerate: async () =>
+          generateJson({
+            summary: 'The client retries.',
+            hunks: [{ id: 'h2', what: 'Wraps the call in retry.' }],
+          }),
+      })
+
+      const summary = await summarize(source, { model })
+
+      expect(summary.hunkNotes).toEqual({ h1: 'Adds a backoff.', h2: 'Wraps the call in retry.' })
+      expect(model.doGenerateCalls).toHaveLength(1)
+      const prompt = JSON.stringify(model.doGenerateCalls[0]!.prompt)
+      expect(prompt).toContain('[h2] src/client.ts')
+      expect(prompt).not.toContain('[h1]')
+    })
+
+    it('does not ask again when every hunk has a note', async () => {
+      const model = new MockLanguageModelV4({
+        doStream: async () => streamJson(JSON.stringify(answer)),
+      })
+
+      await summarize(source, { model })
+
+      expect(model.doGenerateCalls).toHaveLength(0)
+    })
+
+    it('keeps a summary that comes without any notes, and writes the notes', async () => {
+      const model = new MockLanguageModelV4({
+        doStream: async () => streamJson(JSON.stringify({ ...answer, hunkNotes: undefined })),
+        doGenerate: async (options) => {
+          const h = JSON.stringify(options.prompt).includes('src/retry.ts') ? 'h1' : 'h2'
+          return generateJson({ summary: 's', hunks: [{ id: h, what: `note ${h}` }] })
+        },
+      })
+
+      const summary = await summarize(source, { model })
+
+      expect(summary.hunkNotes).toEqual({ h1: 'note h1', h2: 'note h2' })
+    })
+
+    it('requires the notes from the model in one pass, but not in map-reduce, where the file pass writes them', async () => {
+      const single = new MockLanguageModelV4({
+        doStream: async () => streamJson(JSON.stringify(answer)),
+      })
+      await summarize(source, { model: single })
+      const reduce = new MockLanguageModelV4({
+        doGenerate: async () => generateJson({ summary: 's', hunks: [] }),
+        doStream: async () => streamJson(JSON.stringify(answer)),
+      })
+      await summarize(source, { model: reduce, tokenBudget: 10 })
+
+      const required = (m: MockLanguageModelV4) => {
+        const format = m.doStreamCalls[0]!.responseFormat as { schema?: { required?: string[] } }
+        return format.schema?.required ?? []
+      }
+      expect(required(single)).toContain('hunkNotes')
+      expect(required(reduce)).not.toContain('hunkNotes')
+    })
+
+    it('keeps the summary when the note pass fails', async () => {
+      const model = new MockLanguageModelV4({
+        doStream: async () => streamJson(JSON.stringify(withoutH2)),
+        doGenerate: async () => Promise.reject(new Error('rate limit')),
+      })
+
+      const summary = await summarize(source, { model })
+
+      expect(summary.goals[0]!.title).toBe('Retry failed calls')
+      expect(summary.hunkNotes).toEqual({ h1: 'Adds a backoff.' })
+    })
   })
 })

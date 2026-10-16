@@ -6,7 +6,13 @@ import type { SummaryProgress } from '@shared/progress'
 import type { LoadedSource } from '@shared/source'
 import { STE_RULES } from './style'
 import { describeTool } from '@shared/tool-activity'
-import { buildSummary, modelSummarySchema, type ModelSummary, type Summary } from '@shared/summary'
+import {
+  acceptedSummarySchema,
+  buildSummary,
+  modelSummarySchema,
+  type ModelSummary,
+  type Summary,
+} from '@shared/summary'
 
 type PartialSummary = DeepPartial<ModelSummary>
 
@@ -107,6 +113,41 @@ interface Digest {
   notes: Record<string, string>
 }
 
+async function digestFile(source: LoadedSource, f: DiffFile, opts: SummarizeOptions) {
+  const { output } = await generateText({
+    model: opts.model,
+    system: STE_RULES,
+    output: Output.object({ schema: fileDigestSchema }),
+    abortSignal: opts.abortSignal,
+    prompt: `${sourceIntro(source)}\n\nSummarize the edits in one file. Describe each hunk in one sentence.\n\n${promptHunks([f])}`,
+  })
+  return output
+}
+
+/**
+ * The model can leave out the notes of some hunks. A hunk without a note looks like a hunk with
+ * nothing to say, so ask for the notes again, one file at a time. A failed file keeps its gaps.
+ */
+async function fillMissingNotes(
+  source: LoadedSource,
+  notes: Record<string, string>,
+  opts: SummarizeOptions,
+  onNoted: (count: number) => void,
+): Promise<void> {
+  const files = readableFiles(source.files).filter((f) => f.hunks.some((h) => !notes[h.id]))
+  await mapLimit(files, opts.concurrency ?? 4, async (f) => {
+    try {
+      const output = await digestFile(source, f, opts)
+      const ids = new Set(f.hunks.map((h) => h.id))
+      for (const h of output.hunks)
+        if (ids.has(h.id) && !notes[h.id] && h.what.trim()) notes[h.id] = h.what.trim()
+      onNoted(Object.keys(notes).length)
+    } catch {
+      // The summary is still good without these notes.
+    }
+  })
+}
+
 async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promise<Digest> {
   const files = readableFiles(source.files)
   const notes: Record<string, string> = {}
@@ -115,13 +156,7 @@ async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promis
     opts.onProgress?.({ plan: 'map-reduce', phase: 'digesting', done, total: files.length, file })
   report()
   const digests = await mapLimit(files, opts.concurrency ?? 4, async (f) => {
-    const { output } = await generateText({
-      model: opts.model,
-      system: STE_RULES,
-      output: Output.object({ schema: fileDigestSchema }),
-      abortSignal: opts.abortSignal,
-      prompt: `${sourceIntro(source)}\n\nSummarize the edits in one file. Describe each hunk in one sentence.\n\n${promptHunks([f])}`,
-    })
+    const output = await digestFile(source, f, opts)
     for (const h of output.hunks) notes[h.id] = h.what
     done++
     report(f.path)
@@ -147,7 +182,10 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
   const result = streamText({
     model: opts.model,
     system: INSTRUCTIONS,
-    output: Output.object({ schema: modelSummarySchema }),
+    // In map-reduce, the file pass wrote a note for each hunk already.
+    output: Output.object({
+      schema: plan === 'single' ? modelSummarySchema : acceptedSummarySchema,
+    }),
     abortSignal: opts.abortSignal,
     prompt: `${sourceIntro(source)}\n\n${findings}${body}`,
   })
@@ -178,9 +216,11 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
     },
     source.files,
   ).hunkNotes
+  const notes = { ...fromDigest, ...summary.hunkNotes }
+  await fillMissingNotes(source, notes, opts, (n) => report('noting', Math.max(n, noted)))
   // The coverage check puts every hunk in a change, and the notes are done. The bar must not move back.
   report('noting', hunkIds.size)
-  return { ...summary, hunkNotes: { ...fromDigest, ...summary.hunkNotes } }
+  return { ...summary, hunkNotes: notes }
 }
 
 function countNoted(partial: PartialSummary, hunkIds: Set<string>): number {
@@ -241,11 +281,11 @@ function isWellFormed(p: unknown): p is PartialSummary {
 }
 
 async function finalObject(result: {
-  output: PromiseLike<ModelSummary>
+  output: PromiseLike<unknown>
   text: PromiseLike<string>
 }): Promise<ModelSummary> {
   try {
-    return await result.output
+    return acceptedSummarySchema.parse(await result.output)
   } catch (error) {
     const recovered = lastValidObject(await result.text)
     if (recovered) return recovered
@@ -264,7 +304,7 @@ function lastValidObject(text: string): ModelSummary | null {
     const end = matchingBrace(text, start)
     if (end === -1) continue
     try {
-      const parsed = modelSummarySchema.safeParse(JSON.parse(text.slice(start, end + 1)))
+      const parsed = acceptedSummarySchema.safeParse(JSON.parse(text.slice(start, end + 1)))
       if (parsed.success) found = parsed.data
     } catch {
       // Not JSON. Try the next brace.

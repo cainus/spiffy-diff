@@ -36,11 +36,18 @@ export const modelSummarySchema = z.object({
         note: z.string().describe('What this hunk does and why, in one or two short sentences.'),
       }),
     )
-    .optional()
-    .describe('One note for each hunk.'),
+    .describe('One note for each hunk. Write a note for every hunk ID in the diff.'),
 })
 
-export type ModelSummary = z.infer<typeof modelSummarySchema>
+/**
+ * The schema to read the model answer. The model must send notes (see the schema above), but an
+ * answer without notes is still a good summary: the note pass then writes the notes.
+ */
+export const acceptedSummarySchema = modelSummarySchema.extend({
+  hunkNotes: modelSummarySchema.shape.hunkNotes.optional(),
+})
+
+export type ModelSummary = z.infer<typeof acceptedSummarySchema>
 
 export interface Change {
   id: string
