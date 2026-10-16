@@ -9,7 +9,8 @@ const MAX_PHRASE = 200
 interface Pick {
   phrase: string
   context: string
-  inPopup: boolean
+  /** The level of the popup that has the selection, or -1 outside the popups. */
+  level: number
   anchor: Anchor
 }
 
@@ -31,14 +32,14 @@ function readSelection(): Pick | null {
   return {
     phrase,
     context: root.textContent ?? '',
-    inPopup: !!root.closest('[data-explain-popup]'),
+    level: Number(root.closest('[data-explain-popup]')?.getAttribute('data-explain-popup') ?? -1),
     anchor: anchorOf(rect),
   }
 }
 
 /** A small button at a text selection. It explains the selected phrase. */
 export function SelectionExplain() {
-  const { open, push } = useExplain()
+  const { open } = useExplain()
   const [pick, setPick] = useState<Pick | null>(null)
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export function SelectionExplain() {
           key="explain-selection"
           type="button"
           aria-label="Explain selection"
+          data-explain-selection=""
           initial={{ opacity: 0, y: 4, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
@@ -77,12 +79,11 @@ export function SelectionExplain() {
           onMouseUp={(e) => e.stopPropagation()}
           onClick={() => {
             const step = { phrase: pick.phrase, context: pick.context }
-            if (pick.inPopup) push(step)
-            else open(step, pick.anchor)
+            open(step, pick.anchor, pick.level + 1)
             window.getSelection()?.removeAllRanges()
             setPick(null)
           }}
-          className="bg-primary text-primary-foreground z-50 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium shadow-lg"
+          className="bg-primary text-primary-foreground z-[100] inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium shadow-lg"
         >
           <Sparkles className="size-3" />
           Explain

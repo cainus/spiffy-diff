@@ -20,22 +20,24 @@ export interface Anchor {
   height: number
 }
 
+/** One open popup. Popup N+1 shows on top of popup N. */
 export interface Popup {
+  step: Step
   anchor: Anchor
-  trail: Step[]
-  direction: 1 | -1
 }
 
 export interface ExplainApi {
   entries: Record<string, Entry>
   /** The phrases with a saved explanation. The UI underlines them. */
   phrases: string[]
-  popup: Popup | null
-  open: (step: Step, anchor: Anchor) => void
-  push: (step: Step) => void
-  back: () => void
-  close: () => void
-  refresh: () => void
+  /** The open popups, from the bottom to the top. */
+  popups: Popup[]
+  /** Open a popup at `level`. This closes the popups at `level` and above first. */
+  open: (step: Step, anchor: Anchor, level?: number) => void
+  /** Close the popups at `level` and above. */
+  closeFrom: (level: number) => void
+  /** Explain the phrase of the popup at `level` again. */
+  refresh: (level: number) => void
 }
 
 export const ExplainContext = createContext<ExplainApi | null>(null)

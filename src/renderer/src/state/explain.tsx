@@ -11,7 +11,7 @@ import { ExplainContext, type Entry, type ExplainApi, type Popup, type Step } fr
 export function ExplainProvider({ children }: { children: ReactNode }) {
   const { sessionId, backend } = useStore()
   const [entries, setEntries] = useState<Record<string, Entry>>({})
-  const [popup, setPopup] = useState<Popup | null>(null)
+  const [popups, setPopups] = useState<Popup[]>([])
   const cancels = useRef<(() => void)[]>([])
 
   useEffect(() => {
@@ -76,26 +76,18 @@ export function ExplainProvider({ children }: { children: ReactNode }) {
       phrases: Object.values(entries)
         .filter((e) => e.status === 'done')
         .map((e) => e.phrase),
-      popup,
-      open: (step, anchor) => {
-        setPopup({ anchor, trail: [step], direction: 1 })
+      popups,
+      open: (step, anchor, level = 0) => {
+        setPopups((stack) => [...stack.slice(0, level), { step, anchor }])
         explore(step)
       },
-      push: (step) => {
-        setPopup((p) => (p ? { ...p, trail: [...p.trail, step], direction: 1 } : p))
-        explore(step)
-      },
-      back: () =>
-        setPopup((p) =>
-          p && p.trail.length > 1 ? { ...p, trail: p.trail.slice(0, -1), direction: -1 } : p,
-        ),
-      close: () => setPopup(null),
-      refresh: () => {
-        const step = popup?.trail[popup.trail.length - 1]
+      closeFrom: (level) => setPopups((stack) => stack.slice(0, level)),
+      refresh: (level) => {
+        const step = popups[level]?.step
         if (step) explore(step, true)
       },
     }),
-    [entries, popup, explore],
+    [entries, popups, explore],
   )
 
   return <ExplainContext.Provider value={api}>{children}</ExplainContext.Provider>

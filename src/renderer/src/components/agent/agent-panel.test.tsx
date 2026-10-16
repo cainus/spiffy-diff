@@ -280,7 +280,53 @@ describe('explaining a selection', () => {
     expect(bridge.explainTerm).not.toHaveBeenCalled()
   })
 
-  it('explains text that you select in the popup, in the same popup, with a way back', async () => {
+  it('opens a popup on top when you select text in a popup, recursively, and keeps the lower popups', async () => {
+    const finish = explainWith({
+      retry: [{ type: 'text', delta: 'Retry uses backoff between calls.' }],
+      backoff: [{ type: 'text', delta: 'Backoff adds jitter to the wait.' }],
+      jitter: [{ type: 'text', delta: 'Jitter is a random part of the wait.' }],
+    })
+    const user = await openPr()
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('retry')
+    const first = await screen.findByRole('dialog', { name: 'retry' })
+    await vi.waitFor(() => expect(first.textContent).toContain('backoff'))
+
+    select(first, 'backoff')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('backoff')
+    const second = await screen.findByRole('dialog', { name: 'backoff' })
+    await vi.waitFor(() => expect(second.textContent).toContain('jitter'))
+
+    select(second, 'jitter')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('jitter')
+    const third = await screen.findByRole('dialog', { name: 'jitter' })
+    await vi.waitFor(() =>
+      expect(third.textContent).toContain('Jitter is a random part of the wait.'),
+    )
+
+    expect(screen.getAllByRole('dialog').map((d) => d.getAttribute('aria-label'))).toEqual([
+      'retry',
+      'backoff',
+      'jitter',
+    ])
+    expect(bridge.explainTerm).toHaveBeenLastCalledWith(
+      expect.objectContaining({ phrase: 'jitter', context: 'Backoff adds jitter to the wait.' }),
+      expect.anything(),
+    )
+
+    await user.keyboard('{Escape}')
+    await vi.waitFor(() =>
+      expect(screen.getAllByRole('dialog').map((d) => d.getAttribute('aria-label'))).toEqual([
+        'retry',
+        'backoff',
+      ]),
+    )
+  })
+
+  it('closes the popups above a popup when you click in it', async () => {
     const finish = explainWith({
       retry: [{ type: 'text', delta: 'Retry uses backoff between calls.' }],
       backoff: [{ type: 'text', delta: 'Backoff waits longer each time.' }],
@@ -289,23 +335,55 @@ describe('explaining a selection', () => {
     select(overview(), 'retry')
     await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
     finish('retry')
-    const popup = await screen.findByRole('dialog', { name: 'retry' })
-    await vi.waitFor(() => expect(popup.textContent).toContain('backoff'))
-
-    select(popup, 'backoff')
+    const first = await screen.findByRole('dialog', { name: 'retry' })
+    await vi.waitFor(() => expect(first.textContent).toContain('backoff'))
+    select(first, 'backoff')
     await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
     finish('backoff')
+    await screen.findByRole('dialog', { name: 'backoff' })
 
-    const inner = await screen.findByRole('dialog', { name: 'backoff' })
-    await vi.waitFor(() => expect(inner.textContent).toContain('Backoff waits longer each time.'))
-    expect(bridge.explainTerm).toHaveBeenLastCalledWith(
-      expect.objectContaining({ phrase: 'backoff', context: 'Retry uses backoff between calls.' }),
-      expect.anything(),
+    await user.click(within(first).getByText('retry'))
+
+    await vi.waitFor(() =>
+      expect(screen.getAllByRole('dialog').map((d) => d.getAttribute('aria-label'))).toEqual([
+        'retry',
+      ]),
     )
-    await user.click(within(inner).getByRole('button', { name: 'Back to retry' }))
-    expect((await screen.findByRole('dialog', { name: 'retry' })).textContent).toContain(
-      'Retry uses backoff',
+  })
+
+  it('opens a saved phrase in a popup on top when you click it in a popup', async () => {
+    bridge.explanations = vi.fn(async () => ({
+      backoff: { phrase: 'backoff', text: 'Backoff waits longer each time.' },
+    }))
+    const finish = explainWith({
+      retry: [{ type: 'text', delta: 'Retry uses backoff between calls.' }],
+    })
+    const user = await openPr()
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('retry')
+    const first = await screen.findByRole('dialog', { name: 'retry' })
+
+    await user.click(await within(first).findByRole('button', { name: 'Explain backoff' }))
+
+    expect((await screen.findByRole('dialog', { name: 'backoff' })).textContent).toContain(
+      'Backoff waits longer',
     )
+    expect(screen.getByRole('dialog', { name: 'retry' })).toBeTruthy()
+  })
+
+  it('shows `code` in an explanation as code, without the backticks', async () => {
+    const finish = explainWith({
+      retry: [{ type: 'text', delta: 'It calls `withRetry` on the client.' }],
+    })
+    const user = await openPr()
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('retry')
+
+    const popup = await screen.findByRole('dialog', { name: 'retry' })
+    await vi.waitFor(() => expect(popup.textContent).toContain('It calls withRetry on the client.'))
+    expect(within(popup).getByText('withRetry').closest('code')).not.toBeNull()
   })
 
   it('explains the phrase again with the refresh button', async () => {
