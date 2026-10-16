@@ -29,6 +29,15 @@ export const modelSummarySchema = z.object({
       }),
     )
     .describe('The main goals, most important first.'),
+  hunkNotes: z
+    .array(
+      z.object({
+        hunkId: z.string(),
+        note: z.string().describe('What this hunk does and why, in one or two short sentences.'),
+      }),
+    )
+    .optional()
+    .describe('One note for each hunk.'),
 })
 
 export type ModelSummary = z.infer<typeof modelSummarySchema>
@@ -53,6 +62,8 @@ export interface Goal {
 export interface Summary {
   overview: string
   goals: Goal[]
+  /** One explanation for each hunk ID. Summaries in an old format have none. */
+  hunkNotes?: Record<string, string>
 }
 
 interface DraftGoal {
@@ -115,7 +126,12 @@ export function buildSummary(model: ModelSummary, files: DiffFile[]): Summary {
       return { ...g, id, changes: g.changes.map((c, ci) => ({ ...c, id: `${id}.c${ci + 1}` })) }
     })
 
-  return { overview: model.overview, goals }
+  const hunkNotes: Record<string, string> = {}
+  for (const n of model.hunkNotes ?? []) {
+    if (reviewable.has(n.hunkId) && n.note.trim()) hunkNotes[n.hunkId] = n.note.trim()
+  }
+
+  return { overview: model.overview, goals, hunkNotes }
 }
 
 export interface HunkOwner {

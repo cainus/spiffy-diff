@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { FileMinus, FilePen, FilePlus, FileSymlink, Image } from 'lucide-react'
-import { filePatch, type DiffFile } from '@shared/diff'
+import type { DiffFile } from '@shared/diff'
 import { isNoise } from '@shared/noise'
-import { PatchView } from '@/components/diff/patch-view'
+import { HunkRow } from '@/components/diff/hunk-row'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { slideVariants, spring } from '@/lib/motion'
@@ -151,28 +151,26 @@ function HunkBlock({
 }) {
   const { owners, summary, nav$ } = useStore()
   const mine = owners.get(hunkId) ?? []
-  return (
-    <section className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {mine.map((o) => {
-          const goal = summary?.goals.find((g) => g.id === o.goalId)
-          const change = goal?.changes.find((c) => c.id === o.changeId)
-          if (!goal || !change) return null
-          return (
-            <motion.button
-              key={o.changeId}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => nav$({ type: 'openChange', goalId: goal.id, changeId: change.id })}
-              className="bg-primary/10 text-primary hover:bg-primary/20 rounded-full px-2 py-0.5 text-[11px]"
-              title={`${goal.title} › ${change.title}`}
-            >
-              {goal.title} › {change.title}
-            </motion.button>
-          )
-        })}
-      </div>
-      <PatchView patch={filePatch(file, [hunkId])} delay={delay} diffStyle={diffStyle} />
-    </section>
+  const badges = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {mine.map((o) => {
+        const goal = summary?.goals.find((g) => g.id === o.goalId)
+        const change = goal?.changes.find((c) => c.id === o.changeId)
+        if (!goal || !change) return null
+        return (
+          <motion.button
+            key={o.changeId}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => nav$({ type: 'openChange', goalId: goal.id, changeId: change.id })}
+            className="bg-primary/10 text-primary hover:bg-primary/20 rounded-full px-2 py-0.5 text-[11px]"
+            title={`${goal.title} › ${change.title}`}
+          >
+            {goal.title} › {change.title}
+          </motion.button>
+        )
+      })}
+    </div>
   )
+  return <HunkRow file={file} hunkId={hunkId} delay={delay} diffStyle={diffStyle} header={badges} />
 }

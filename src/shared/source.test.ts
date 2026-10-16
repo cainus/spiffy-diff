@@ -42,6 +42,18 @@ describe('summaryCacheKey', () => {
     expect(summaryCacheKey(base)).toBe(summaryCacheKey({ ...base }))
   })
 
+  it('has a format version, so that summaries in an old format are made again', () => {
+    expect(
+      summaryCacheKey({
+        repo: 'a/b',
+        baseSha: '1',
+        headSha: '2',
+        dirtyHash: null,
+        backend: 'claude',
+      }),
+    ).toMatch(/^v2-/)
+  })
+
   it('is safe to use as a file name', () => {
     expect(
       summaryCacheKey({

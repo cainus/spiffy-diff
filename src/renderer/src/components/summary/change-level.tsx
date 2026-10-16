@@ -1,8 +1,8 @@
 import { motion } from 'motion/react'
 import { ExternalLink } from 'lucide-react'
-import { filePatch, type Hunk } from '@shared/diff'
+import type { Hunk } from '@shared/diff'
 import type { Change, Goal } from '@shared/summary'
-import { PatchView } from '@/components/diff/patch-view'
+import { HunkRow } from '@/components/diff/hunk-row'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { itemVariants, spring } from '@/lib/motion'
 import { groupByFile, lineStats } from '@/lib/stats'
@@ -23,7 +23,7 @@ export function ChangeLevel({
 
   return (
     <ScrollArea className="h-full">
-      <div className="mx-auto max-w-5xl space-y-6 px-8 py-8">
+      <div className="mx-auto max-w-6xl space-y-6 px-8 py-8">
         <motion.header
           layoutId={`change-${change.id}`}
           transition={spring}
@@ -51,7 +51,11 @@ export function ChangeLevel({
               {g.file.path}
               <ExternalLink className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
             </button>
-            <PatchView patch={filePatch(g.file, g.hunkIds)} delay={240 + i * 60} />
+            <div className="space-y-3">
+              {g.hunkIds.map((id, j) => (
+                <HunkRow key={id} file={g.file} hunkId={id} delay={240 + (i + j) * 60} />
+              ))}
+            </div>
           </motion.section>
         ))}
       </div>

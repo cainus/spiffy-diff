@@ -63,6 +63,7 @@ const summary: Summary = {
       ],
     },
   ],
+  hunkNotes: { h1: 'The client calls the API through retry.', h2: 'The helper runs the function.' },
 }
 
 function fakeBridge(): SpiffyBridge {
@@ -145,6 +146,31 @@ describe('the summary', () => {
     )
 
     expect(await screen.findByRole('button', { name: /Retry failed calls/ })).toBeTruthy()
+  })
+})
+
+describe('hunk notes', () => {
+  it('shows the note of each hunk beside its code in a change', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+
+    const note = await screen.findByText('The client calls the API through retry.')
+    // The diff renders after the zoom animation.
+    await vi.waitFor(() =>
+      expect(
+        note.closest('[data-hunk]')?.querySelector('[data-testid=patch]')?.textContent,
+      ).toContain('+retry(call)'),
+    )
+    expect(screen.queryByText('The helper runs the function.')).toBeNull()
+  })
+
+  it('shows the note of each hunk in the files view', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: 'files' }))
+    await user.click(await screen.findByRole('button', { name: /retry\.ts/ }))
+
+    expect(await screen.findByText('The helper runs the function.')).toBeTruthy()
   })
 })
 

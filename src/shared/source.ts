@@ -25,10 +25,13 @@ export interface CacheKeyParts {
   backend: Backend
 }
 
+/** Change this when the summary format changes. Then spiffy makes old summaries again. */
+const SUMMARY_VERSION = 'v2'
+
 /** The cache key for one summary. A new push or a new dirty tree gives a new key. */
 export function summaryCacheKey(p: CacheKeyParts): string {
   const repo = p.repo.replace(/[^\w.-]/g, '_')
-  return [repo, p.baseSha, p.headSha, p.dirtyHash ?? 'clean', p.backend].join('-')
+  return [SUMMARY_VERSION, repo, p.baseSha, p.headSha, p.dirtyHash ?? 'clean', p.backend].join('-')
 }
 
 /** A source after spiffy reads it. See CONTEXT.md. */

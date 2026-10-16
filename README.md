@@ -4,7 +4,7 @@ Spiffy is a desktop app. It explains a GitHub pull request or a local branch fro
 
 1. **Goals**: the main purposes of the changes.
 2. **Changes**: the related sets of code edits for each goal.
-3. **Code**: the diff hunks of each change.
+3. **Code**: the diff hunks of each change, with a short STE note beside each hunk.
 
 An agent panel is available at each level. You can ask questions about the part that you look at.
 The **Files** view shows all changed files, one diff at a time. Each hunk links to its change.

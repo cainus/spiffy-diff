@@ -36,6 +36,7 @@ For each goal, list the changes. A change is one related set of code edits that 
 Attach hunks to changes with their hunk IDs, for example "h3". Use only hunk IDs that you see.
 Attach every hunk to at least one change.
 Use the findings from the code to write why each change exists, not only what it does.
+Write one note for each hunk: what the hunk does and why.
 
 ${STE_RULES}`
 
@@ -93,8 +94,14 @@ async function mapLimit<T, R>(
   return out
 }
 
-async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promise<string> {
+interface Digest {
+  text: string
+  notes: Record<string, string>
+}
+
+async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promise<Digest> {
   const files = reviewable(source.files).filter((f) => !f.binary && f.hunks.length > 0)
+  const notes: Record<string, string> = {}
   const digests = await mapLimit(files, opts.concurrency ?? 4, async (f) => {
     const { output } = await generateText({
       model: opts.model,
@@ -103,19 +110,20 @@ async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promis
       abortSignal: opts.abortSignal,
       prompt: `${sourceIntro(source)}\n\nSummarize the edits in one file. Describe each hunk in one sentence.\n\n${promptHunks([f])}`,
     })
+    for (const h of output.hunks) notes[h.id] = h.what
     const hunks = output.hunks.map((h) => `  [${h.id}] ${h.what}`).join('\n')
     return `${fileHeader(f)}: ${output.summary}\n${hunks}`
   })
-  return digests.join('\n\n')
+  return { text: digests.join('\n\n'), notes }
 }
 
 /** Make the summary of a source. See PLAN.md decision 10. */
 export async function summarize(source: LoadedSource, opts: SummarizeOptions): Promise<Summary> {
   const plan = choosePlan(source.files, opts.tokenBudget ?? DEFAULT_BUDGET)
-  const body =
-    plan === 'single'
-      ? `Hunks:\n\n${promptHunks(source.files)}`
-      : `The changes are too large to show in full. These are summaries of each file and each hunk:\n\n${await digestFiles(source, opts)}`
+  const digest = plan === 'single' ? null : await digestFiles(source, opts)
+  const body = digest
+    ? `The changes are too large to show in full. These are summaries of each file and each hunk:\n\n${digest.text}`
+    : `Hunks:\n\n${promptHunks(source.files)}`
 
   let findings = ''
   if (opts.investigate) {
@@ -140,7 +148,17 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
   for await (const partial of result.partialOutputStream) {
     if (isWellFormed(partial)) opts.onPartial?.(partial)
   }
-  return buildSummary(await finalObject(result), source.files)
+  const summary = buildSummary(await finalObject(result), source.files)
+  // In map-reduce, the hunk descriptions of the file pass fill the notes that the model left out.
+  const fromDigest = buildSummary(
+    {
+      overview: '',
+      goals: [],
+      hunkNotes: Object.entries(digest?.notes ?? {}).map(([hunkId, note]) => ({ hunkId, note })),
+    },
+    source.files,
+  ).hunkNotes
+  return { ...summary, hunkNotes: { ...fromDigest, ...summary.hunkNotes } }
 }
 
 function isWellFormed(p: unknown): p is PartialSummary {

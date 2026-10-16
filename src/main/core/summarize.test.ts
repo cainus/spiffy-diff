@@ -200,6 +200,23 @@ describe('summarize', () => {
     expect(steps).toEqual(['investigating', 'summarizing'])
   })
 
+  it('asks the model for one note for each hunk', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () =>
+        streamJson(
+          JSON.stringify({
+            ...answer,
+            hunkNotes: [{ hunkId: 'h2', note: 'The client calls retry.' }],
+          }),
+        ),
+    })
+
+    const summary = await summarize(source, { model })
+
+    expect(JSON.stringify(model.doStreamCalls[0]!.prompt)).toContain('one note for each hunk')
+    expect(summary.hunkNotes).toEqual({ h2: 'The client calls retry.' })
+  })
+
   it('tells the model to write in ASD-STE100', async () => {
     const model = new MockLanguageModelV4({
       doStream: async () => streamJson(JSON.stringify(answer)),
@@ -231,5 +248,6 @@ describe('summarize', () => {
     expect(reducePrompt).toContain('retry summary')
     expect(reducePrompt).toContain('[h2] client hunk')
     expect(summary.goals[0]!.changes[0]!.hunkIds).toEqual(['h1', 'h2'])
+    expect(summary.hunkNotes).toEqual({ h1: 'retry hunk', h2: 'client hunk' })
   })
 })

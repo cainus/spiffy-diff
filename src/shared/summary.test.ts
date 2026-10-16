@@ -154,6 +154,37 @@ describe('buildSummary', () => {
   })
 })
 
+describe('hunk notes', () => {
+  it('keeps one note for each known reviewable hunk', () => {
+    const summary = buildSummary(
+      {
+        overview: '',
+        goals: [
+          {
+            title: 'G',
+            description: '',
+            changes: [{ title: 'c', description: '', hunkIds: ['h1', 'h2', 'h3'] }],
+          },
+        ],
+        hunkNotes: [
+          { hunkId: 'h1', note: 'The loop retries the call.' },
+          { hunkId: 'h99', note: 'invented' },
+          { hunkId: 'h4', note: 'lockfile' },
+        ],
+      },
+      files,
+    )
+
+    expect(summary.hunkNotes).toEqual({ h1: 'The loop retries the call.' })
+  })
+
+  it('has no notes when the model gives none', () => {
+    const summary = buildSummary({ overview: '', goals: [] }, files)
+
+    expect(summary.hunkNotes).toEqual({})
+  })
+})
+
 describe('hunkOwners', () => {
   it('lists every goal and change that owns each hunk', () => {
     const summary = buildSummary(
