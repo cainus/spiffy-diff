@@ -2,10 +2,16 @@ import type { LanguageModel } from 'ai'
 import { claudeCode, type ClaudeCodeSettings } from 'ai-sdk-provider-claude-code'
 import { codexCli, listModels, type CodexCliSettings } from 'ai-sdk-provider-codex-cli'
 import type { Backend } from '@shared/source'
+import { STE_RULES } from './style'
 
 export type Purpose = 'summary' | 'chat'
 
 const READ_TOOLS = ['Read', 'Grep', 'Glob']
+
+/** Replaces the Claude Code preset, which is for an agent that edits code. */
+const REVIEWER_PROMPT = `You help a reviewer understand code changes. You cannot change files.
+
+${STE_RULES}`
 
 /**
  * The agent is read-only. See PLAN.md decision 5.
@@ -18,6 +24,7 @@ export function claudeSettings(cwd: string, purpose: Purpose): ClaudeCodeSetting
   return {
     cwd,
     permissionMode: 'default',
+    systemPrompt: REVIEWER_PROMPT,
     tools,
     allowedTools: tools,
     settingSources: [],

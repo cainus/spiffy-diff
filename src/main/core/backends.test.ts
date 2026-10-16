@@ -13,6 +13,14 @@ describe('claudeSettings', () => {
     expect(s.mcpServers).toEqual({})
   })
 
+  it('replaces the Claude Code system prompt with a read-only reviewer prompt that has the STE rules', () => {
+    for (const purpose of ['chat', 'summary'] as const) {
+      const prompt = String(claudeSettings('/ws', purpose).systemPrompt)
+      expect(prompt).toContain('ASD-STE100')
+      expect(prompt).toContain('You cannot change files')
+    }
+  })
+
   it('gives the summary pass no tools, so that the answer is one JSON object', () => {
     const s = claudeSettings('/ws', 'summary')
 
