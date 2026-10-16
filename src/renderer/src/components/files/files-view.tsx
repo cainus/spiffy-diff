@@ -3,9 +3,9 @@ import { AnimatePresence, motion } from 'motion/react'
 import { FileMinus, FilePen, FilePlus, FileSymlink, Image } from 'lucide-react'
 import type { DiffFile } from '@shared/diff'
 import { isNoise } from '@shared/noise'
+import { DiffStyleToggle } from '@/components/diff/diff-style-toggle'
 import { HunkRow } from '@/components/diff/hunk-row'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { slideVariants, spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/state/use-store'
@@ -24,7 +24,6 @@ export function FilesView() {
   const files = useMemo(() => source?.files ?? [], [source])
   const selected = files.find((f) => f.path === nav.file) ?? files[0]
   const [order, setOrder] = useState(0)
-  const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>('unified')
 
   useEffect(() => {
     if (!nav.file && files[0]) nav$({ type: 'openFile', path: files[0].path })
@@ -103,16 +102,7 @@ export function FilesView() {
                         ? `${selected.oldPath} → ${selected.path}`
                         : selected.path}
                     </h2>
-                    <ToggleGroup
-                      type="single"
-                      size="sm"
-                      variant="outline"
-                      value={diffStyle}
-                      onValueChange={(v) => v && setDiffStyle(v as 'unified' | 'split')}
-                    >
-                      <ToggleGroupItem value="unified">Unified</ToggleGroupItem>
-                      <ToggleGroupItem value="split">Split</ToggleGroupItem>
-                    </ToggleGroup>
+                    <DiffStyleToggle />
                   </div>
                   {selected.binary && (
                     <p className="text-muted-foreground text-sm">
@@ -125,7 +115,6 @@ export function FilesView() {
                       file={selected}
                       hunkId={h.id}
                       delay={i === 0 ? 120 : 120 + i * 40}
-                      diffStyle={diffStyle}
                     />
                   ))}
                 </div>
@@ -138,17 +127,7 @@ export function FilesView() {
   )
 }
 
-function HunkBlock({
-  file,
-  hunkId,
-  delay,
-  diffStyle,
-}: {
-  file: DiffFile
-  hunkId: string
-  delay: number
-  diffStyle: 'unified' | 'split'
-}) {
+function HunkBlock({ file, hunkId, delay }: { file: DiffFile; hunkId: string; delay: number }) {
   const { owners, summary, nav$ } = useStore()
   const mine = owners.get(hunkId) ?? []
   const badges = (
@@ -172,5 +151,5 @@ function HunkBlock({
       })}
     </div>
   )
-  return <HunkRow file={file} hunkId={hunkId} delay={delay} diffStyle={diffStyle} header={badges} />
+  return <HunkRow file={file} hunkId={hunkId} delay={delay} header={badges} />
 }

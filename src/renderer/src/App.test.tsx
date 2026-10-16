@@ -11,7 +11,11 @@ import { CHECK_EVERY_MS } from './lib/use-version-watch'
 
 // The diff renderer draws into Shadow DOM. The tests check which patch it gets.
 vi.mock('@pierre/diffs/react', () => ({
-  PatchDiff: ({ patch }: { patch: string }) => <pre data-testid="patch">{patch}</pre>,
+  PatchDiff: ({ patch, options }: { patch: string; options?: { diffStyle?: string } }) => (
+    <pre data-testid="patch" data-style={options?.diffStyle}>
+      {patch}
+    </pre>
+  ),
 }))
 // The agent panel has its own tests. Here it only shows the focus label.
 vi.mock('@/components/agent/agent-panel', () => ({ AgentPanel: () => <aside>agent</aside> }))
@@ -452,6 +456,33 @@ describe('the files view', () => {
     )
 
     expect(await screen.findByRole('heading', { name: 'Wrap the call' })).toBeTruthy()
+  })
+})
+
+describe('the diff style', () => {
+  const styles = () => screen.getAllByTestId('patch').map((p) => p.getAttribute('data-style'))
+
+  it('shows the diffs of a change side by side when you pick Split, and keeps the choice everywhere', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+    await vi.waitFor(() => expect(styles()).toEqual(expect.arrayContaining(['unified'])))
+
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+
+    await vi.waitFor(() => expect(new Set(styles())).toEqual(new Set(['split'])))
+    await user.click(screen.getByRole('button', { name: 'files' }))
+    await vi.waitFor(() => expect(new Set(styles())).toEqual(new Set(['split'])))
+    expect(localStorage.getItem('spiffy.diffStyle')).toBe('split')
+  })
+
+  it('starts with the style that you picked last time', async () => {
+    localStorage.setItem('spiffy.diffStyle', 'split')
+    const user = await openPr()
+
+    await user.click(screen.getByRole('button', { name: 'files' }))
+
+    await vi.waitFor(() => expect(new Set(styles())).toEqual(new Set(['split'])))
   })
 })
 

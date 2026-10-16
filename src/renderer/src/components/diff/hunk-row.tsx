@@ -3,20 +3,21 @@ import { motion } from 'motion/react'
 import { filePatch, type DiffFile } from '@shared/diff'
 import { PatchView } from '@/components/diff/patch-view'
 import { PhraseText } from '@/components/explain/phrase-text'
+import { useDiffStyle } from '@/lib/diff-style'
 import { useStore } from '@/state/use-store'
 
 interface HunkRowProps {
   file: DiffFile
   hunkId: string
   delay: number
-  diffStyle?: 'unified' | 'split'
   /** Shown above the diff, for example the goal and change badges. */
   header?: ReactNode
 }
 
 /** One hunk: the diff on the left and its STE note in a column on the right. */
-export function HunkRow({ file, hunkId, delay, diffStyle, header }: HunkRowProps) {
+export function HunkRow({ file, hunkId, delay, header }: HunkRowProps) {
   const { summary } = useStore()
+  const [diffStyle] = useDiffStyle()
   const note = summary?.hunkNotes?.[hunkId]
   return (
     <section data-hunk={hunkId} className="grid grid-cols-[minmax(0,1fr)_16rem] items-start gap-4">

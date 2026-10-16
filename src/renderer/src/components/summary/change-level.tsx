@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { ExternalLink } from 'lucide-react'
 import type { Hunk } from '@shared/diff'
 import type { Change, Goal } from '@shared/summary'
+import { DiffStyleToggle } from '@/components/diff/diff-style-toggle'
 import { HunkRow } from '@/components/diff/hunk-row'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { itemVariants, spring } from '@/lib/motion'
@@ -43,6 +44,10 @@ export function ChangeLevel({
           {change.description && <Explained title={change.title} text={change.description} />}
           <LineStats stats={lineStats(change.hunkIds, index)} />
         </motion.header>
+
+        <div className="flex items-center justify-end gap-2">
+          <DiffStyleToggle />
+        </div>
 
         {groups.map((g, i) => (
           <motion.section key={g.file.path} variants={itemVariants} className="space-y-2">
