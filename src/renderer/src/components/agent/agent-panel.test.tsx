@@ -109,6 +109,8 @@ beforeEach(() => {
   })
   window.spiffy = bridge
   localStorage.clear()
+  // The agent panel starts closed. These tests use it.
+  localStorage.setItem('spiffy.agentOpen', 'true')
 })
 
 describe('the agent panel', () => {

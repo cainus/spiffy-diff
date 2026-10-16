@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowLeftRight, RotateCw } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, RotateCw, Sparkles } from 'lucide-react'
 import { BackendPicker } from '@/components/backend-picker'
 import { FilesView } from '@/components/files/files-view'
 import { LocalCopyButton } from '@/components/local-copy-button'
@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { arrowKey } from '@/lib/keys'
+import { useAgentToggle } from '@/lib/use-agent-toggle'
 import { breadcrumbs, type NavState } from '@/lib/nav'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
@@ -42,6 +43,7 @@ export function Workspace() {
   const store = useStore()
   const { nav, nav$, summary, status, error } = store
   const latest = useRef(store)
+  const agent = useAgentToggle()
   useLayoutEffect(() => {
     latest.current = store
   })
@@ -159,6 +161,17 @@ export function Workspace() {
             </Button>
             <Button
               size="sm"
+              variant={agent.open ? 'secondary' : 'ghost'}
+              aria-pressed={agent.open}
+              title="Show or hide the agent"
+              onClick={agent.toggle}
+              className="gap-1.5"
+            >
+              <Sparkles className="size-3.5" />
+              Agent
+            </Button>
+            <Button
+              size="sm"
               variant="ghost"
               title="Open a different PR or branch"
               onClick={store.close}
@@ -204,11 +217,22 @@ export function Workspace() {
               </AnimatePresence>
             </div>
           </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel defaultSize="32%" minSize="20%">
-            <Suspense fallback={null}>
-              <AgentPanel />
-            </Suspense>
+          <ResizableHandle className={cn(!agent.open && 'hidden')} />
+          <ResizablePanel
+            panelRef={agent.panelRef}
+            collapsible
+            collapsedSize="0%"
+            defaultSize={agent.open ? '32%' : '0%'}
+            minSize="20%"
+            onResize={(size) => agent.sync(size.asPercentage > 0)}
+            className={cn(agent.animating && 'transition-[flex-grow] duration-300 ease-out')}
+          >
+            {/* The panel stays mounted when it is closed, so the conversation stays. */}
+            <div data-agent-panel="" hidden={!agent.open} className="h-full">
+              <Suspense fallback={null}>
+                <AgentPanel />
+              </Suspense>
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
         <SelectionExplain />

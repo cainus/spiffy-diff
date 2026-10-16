@@ -469,6 +469,36 @@ describe('the files view', () => {
   })
 })
 
+describe('the agent panel toggle', () => {
+  const panel = () => screen.getByText('agent').closest('[data-agent-panel]')!
+
+  it('starts closed, and opens and closes with the Agent button', async () => {
+    const user = await openPr()
+    const button = screen.getByRole('button', { name: 'Agent' })
+
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(panel().hasAttribute('hidden')).toBe(true)
+
+    await user.click(button)
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(panel().hasAttribute('hidden')).toBe(false)
+
+    await user.click(button)
+    expect(panel().hasAttribute('hidden')).toBe(true)
+  })
+
+  it('remembers that you opened it', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: 'Agent' }))
+    cleanup()
+    localStorage.removeItem('spiffy.last')
+
+    await openPr()
+
+    expect(panel().hasAttribute('hidden')).toBe(false)
+  })
+})
+
 describe('change kinds', () => {
   it('shows the kind of each change in the list and on the change page', async () => {
     const user = await openPr()

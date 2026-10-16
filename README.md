@@ -52,6 +52,9 @@ The app is not signed.
 - Explained phrases are saved per repository in `~/.spiffy/explanations/` (the data folder keeps its old name, because git worktrees in it use absolute paths). They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
 - Diffs show Unified or Split (side by side). The choice is on each change page and in the Files view, and it is remembered.
 - Rerun on a change page makes the agent read the code again and write that change and its hunk notes again. The hunks stay in the same change. The new text is saved in the summary cache.
+- Each change has a type: New functionality, Internal change (performance, logging, metrics, dependencies), or Refactor (no behavior change).
+- The first time a change page opens, the agent reads the code and writes the margin notes (what each hunk changes and why) and a note for each block of red or green lines. Point at a red line for "BEFORE: what the old code did", or at a green line for "NOW: what the new code does". Everything is saved in the summary cache.
+- The agent panel starts closed. The Agent button in the top bar opens it; spiffy-diff remembers the choice.
 - Keys: ↑/↓ move the highlight (or go to the last/next change or file), → or Enter drills in, ← or Escape drills out.
 - spiffy-diff checks for new commits (or new uncommitted changes on a branch) every minute while the window has the focus, and when you come back to the window. A banner offers Reload, which keeps your place.
 - At start, spiffy-diff opens the last source at the place where you left it. Press Change PR in the top bar to open a different PR or branch.
