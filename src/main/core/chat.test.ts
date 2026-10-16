@@ -151,3 +151,24 @@ describe('chatStream context', () => {
     expect(prompt).toContain('The diff is too large')
   })
 })
+
+describe('chatStream errors', () => {
+  it('sends the real error text to the UI', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () => {
+        throw new Error('spawn ENOTDIR')
+      },
+    })
+
+    const chunks = await collect(
+      await chatStream({ model, source, summary, messages, focus: { level: 'source' } }),
+    )
+
+    expect(chunks).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        errorText: expect.stringContaining('spawn ENOTDIR'),
+      }),
+    )
+  })
+})

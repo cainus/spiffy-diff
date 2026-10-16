@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { claudeSettings, codexSettings, pickCodexModel } from './backends'
+import { claudeSettings, codexSettings, findOnPath, pickCodexModel } from './backends'
 
 describe('claudeSettings', () => {
   it('gives the chat agent only read-only tools in the workspace, without user settings or MCP servers', () => {
@@ -21,6 +21,13 @@ describe('claudeSettings', () => {
     }
   })
 
+  it('uses the claude program that you installed when one is given', () => {
+    expect(
+      claudeSettings('/ws', 'chat', '/opt/homebrew/bin/claude').pathToClaudeCodeExecutable,
+    ).toBe('/opt/homebrew/bin/claude')
+    expect(claudeSettings('/ws', 'chat').pathToClaudeCodeExecutable).toBeUndefined()
+  })
+
   it('gives the summary pass no tools, so that the answer is one JSON object', () => {
     const s = claudeSettings('/ws', 'summary')
 
@@ -40,6 +47,15 @@ describe('codexSettings', () => {
   })
 })
 
+describe('codexSettings executable', () => {
+  it('uses the codex program that you installed when one is given', () => {
+    expect(codexSettings('/ws', '/Users/me/.local/bin/codex').codexPath).toBe(
+      '/Users/me/.local/bin/codex',
+    )
+    expect(codexSettings('/ws').codexPath).toBeUndefined()
+  })
+})
+
 describe('pickCodexModel', () => {
   it('uses the model that Codex marks as default', () => {
     expect(
@@ -52,5 +68,20 @@ describe('pickCodexModel', () => {
 
   it('uses the first visible model when no model is the default', () => {
     expect(pickCodexModel([{ id: 'x', hidden: true }, { id: 'y' }])).toBe('y')
+  })
+})
+
+describe('findOnPath', () => {
+  it('finds an executable file in a PATH folder', async () => {
+    const { mkdtempSync, writeFileSync, chmodSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const a = mkdtempSync(join(tmpdir(), 'spiffy-path-'))
+    const b = mkdtempSync(join(tmpdir(), 'spiffy-path-'))
+    writeFileSync(join(b, 'claude'), '#!/bin/sh\n')
+    chmodSync(join(b, 'claude'), 0o755)
+
+    expect(findOnPath('claude', `${a}:${b}`)).toBe(join(b, 'claude'))
+    expect(findOnPath('nope', `${a}:${b}`)).toBeUndefined()
   })
 })

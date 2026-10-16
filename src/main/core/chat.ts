@@ -74,5 +74,10 @@ export async function chatStream(req: ChatRequest): Promise<ReadableStream<UIMes
     messages: await convertToModelMessages(req.messages),
     abortSignal: req.abortSignal,
   })
-  return toUIMessageStream({ stream: result.fullStream, originalMessages: req.messages })
+  return toUIMessageStream({
+    stream: result.fullStream,
+    originalMessages: req.messages,
+    // The default text is "An error occurred." The user needs the real cause.
+    onError: (error) => (error instanceof Error ? error.message : String(error)),
+  })
 }

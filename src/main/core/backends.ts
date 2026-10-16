@@ -1,3 +1,5 @@
+import { accessSync, constants } from 'node:fs'
+import { delimiter, join } from 'node:path'
 import type { LanguageModel } from 'ai'
 import { claudeCode, type ClaudeCodeSettings } from 'ai-sdk-provider-claude-code'
 import { codexCli, listModels, type CodexCliSettings } from 'ai-sdk-provider-codex-cli'
@@ -19,7 +21,11 @@ ${STE_RULES}`
  * The summary pass gets no tools: with tools, Claude can answer in more than one turn,
  * and the provider joins the turns into text that is not one JSON object.
  */
-export function claudeSettings(cwd: string, purpose: Purpose): ClaudeCodeSettings {
+export function claudeSettings(
+  cwd: string,
+  purpose: Purpose,
+  executable?: string,
+): ClaudeCodeSettings {
   const tools = purpose === 'chat' ? READ_TOOLS : []
   return {
     cwd,
@@ -29,11 +35,32 @@ export function claudeSettings(cwd: string, purpose: Purpose): ClaudeCodeSetting
     allowedTools: tools,
     settingSources: [],
     mcpServers: {},
+    ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
   }
 }
 
-export function codexSettings(cwd: string): CodexCliSettings {
-  return { cwd, sandboxMode: 'read-only', approvalMode: 'never', skipGitRepoCheck: true }
+/** The full path of an executable program in the PATH folders, or undefined. */
+export function findOnPath(name: string, path = process.env['PATH'] ?? ''): string | undefined {
+  for (const dir of path.split(delimiter).filter(Boolean)) {
+    const file = join(dir, name)
+    try {
+      accessSync(file, constants.X_OK)
+      return file
+    } catch {
+      // Not in this folder.
+    }
+  }
+  return undefined
+}
+
+export function codexSettings(cwd: string, executable?: string): CodexCliSettings {
+  return {
+    cwd,
+    sandboxMode: 'read-only',
+    approvalMode: 'never',
+    skipGitRepoCheck: true,
+    ...(executable ? { codexPath: executable } : {}),
+  }
 }
 
 interface CodexModelInfo {
@@ -57,7 +84,12 @@ export async function createModel(
   cwd: string,
   purpose: Purpose,
 ): Promise<LanguageModel> {
-  if (backend === 'claude') return claudeCode('sonnet', claudeSettings(cwd, purpose))
-  codexModel ??= listModels().then((r) => pickCodexModel(r.models))
-  return codexCli(await codexModel, codexSettings(cwd))
+  // Use the claude program that the user installed and logged in to. The bundled binary is the fallback.
+  if (backend === 'claude')
+    return claudeCode('sonnet', claudeSettings(cwd, purpose, findOnPath('claude')))
+  // Use the codex program that the user installed and logged in to. The bundled copy is the fallback,
+  // and it cannot start from inside a packaged app.
+  const codexPath = findOnPath('codex')
+  codexModel ??= listModels(codexPath ? { codexPath } : {}).then((r) => pickCodexModel(r.models))
+  return codexCli(await codexModel, codexSettings(cwd, codexPath))
 }

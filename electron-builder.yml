@@ -1,0 +1,13 @@
+appId: com.cainus.spiffy
+productName: Spiffy
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+# The Claude Agent SDK starts a native Claude Code binary. A binary cannot run from inside asar.
+asarUnpack:
+  - '**/node_modules/@anthropic-ai/claude-agent-sdk*/**'
+mac:
+  target: dir
+  category: public.app-category.developer-tools
