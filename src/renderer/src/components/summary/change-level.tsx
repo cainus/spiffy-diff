@@ -1,3 +1,4 @@
+import { CodeText } from '@/components/code-text'
 import { motion } from 'motion/react'
 import { ExternalLink } from 'lucide-react'
 import type { Hunk } from '@shared/diff'
@@ -37,7 +38,7 @@ export function ChangeLevel({
             {goal.title}
           </motion.div>
           <motion.h1 layout="position" className="text-xl font-semibold tracking-tight">
-            {change.title}
+            <CodeText text={change.title} />
           </motion.h1>
           {change.description && <Explained title={change.title} text={change.description} />}
           <LineStats stats={lineStats(change.hunkIds, index)} />

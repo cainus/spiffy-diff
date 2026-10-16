@@ -1,3 +1,4 @@
+import { CodeText } from '@/components/code-text'
 import type { ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
 import { HIGHLIGHT, useHighlight } from '@/lib/use-highlight'
@@ -23,7 +24,7 @@ export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk
           className="bg-card space-y-3 rounded-xl border p-6 shadow-sm"
         >
           <motion.h1 layout="position" className="text-2xl font-semibold tracking-tight">
-            {goal.title}
+            <CodeText text={goal.title} />
           </motion.h1>
           <Explained title={goal.title} text={goal.description} />
         </motion.header>
@@ -48,12 +49,14 @@ export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk
                 <motion.div layout="position" className="flex items-center justify-between gap-3">
                   <h2 className="font-medium">
                     <span className="text-muted-foreground mr-2 font-mono text-xs">{i + 1}</span>
-                    {change.title}
+                    <CodeText text={change.title} />
                   </h2>
                   <ArrowRight className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-1" />
                 </motion.div>
                 {change.description && (
-                  <p className="text-muted-foreground text-sm">{change.description}</p>
+                  <p className="text-muted-foreground text-sm">
+                    <CodeText text={change.description} />
+                  </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
                   <LineStats stats={lineStats(change.hunkIds, index)} showFiles={false} />

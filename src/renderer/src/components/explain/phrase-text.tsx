@@ -1,15 +1,7 @@
+import { splitCode } from '@shared/code-spans'
 import { splitPhrases } from '@shared/terms'
+import { CODE_CLASS } from '@/components/code-text'
 import { anchorOf, useExplain } from '@/state/use-explain'
-
-/** Split text at `code` spans. The parts do not have the backticks. */
-function splitCode(text: string): { text: string; code: boolean }[] {
-  return text
-    .split(/(`[^`]+`)/g)
-    .filter(Boolean)
-    .map((s) =>
-      /^`[^`]+`$/.test(s) ? { text: s.slice(1, -1), code: true } : { text: s, code: false },
-    )
-}
 
 /**
  * Text that the user can select to explain. `code` shows as code. Phrases with a saved explanation
@@ -52,7 +44,7 @@ export function PhraseText({
     <span data-explainable="">
       {segments.map((seg, i) =>
         seg.code ? (
-          <code key={`c${i}`} className="bg-muted/60 rounded px-1 py-px font-mono text-[0.9em]">
+          <code key={`c${i}`} className={CODE_CLASS}>
             {render(seg.text)}
           </code>
         ) : (

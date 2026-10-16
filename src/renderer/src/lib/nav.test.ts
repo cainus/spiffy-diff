@@ -130,6 +130,32 @@ describe('focusLabel', () => {
   })
 })
 
+describe('breadcrumbs without backticks', () => {
+  it('removes the backticks of code from the labels', () => {
+    const coded: Summary = {
+      ...summary,
+      goals: [
+        {
+          ...summary.goals[0]!,
+          title: 'Add `age`',
+          changes: [{ ...summary.goals[0]!.changes[0]!, title: 'Wrap `call()`' }],
+        },
+      ],
+    }
+    const state: NavState = {
+      ...initialNav,
+      path: { level: 'change', goalId: 'g1', changeId: 'g1.c1' },
+    }
+
+    expect(breadcrumbs(state, coded).map((c) => c.label)).toEqual([
+      'Overview',
+      'Add age',
+      'Wrap call()',
+    ])
+    expect(focusLabel(state, coded)).toBe('Change: Wrap call()')
+  })
+})
+
 describe('restoreNav', () => {
   it('keeps a saved position that still exists', () => {
     const saved: NavState = {

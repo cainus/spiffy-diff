@@ -1,3 +1,4 @@
+import { CodeText } from '@/components/code-text'
 import { motion } from 'motion/react'
 import { ArrowRight, Boxes, Layers } from 'lucide-react'
 import type { Hunk } from '@shared/diff'
@@ -66,8 +67,12 @@ export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
                   animate="center"
                   className="bg-card/60 space-y-2 rounded-xl border border-dashed p-5"
                 >
-                  <div className="font-medium">{g?.title || <Shimmer>Goal</Shimmer>}</div>
-                  <p className="text-muted-foreground line-clamp-3 text-sm">{g?.description}</p>
+                  <div className="font-medium">
+                    {g?.title ? <CodeText text={g.title} /> : <Shimmer>Goal</Shimmer>}
+                  </div>
+                  <p className="text-muted-foreground line-clamp-3 text-sm">
+                    {g?.description && <CodeText text={g.description} />}
+                  </p>
                   <div className="text-muted-foreground text-xs">
                     {g?.changes?.length ?? 0} changes so far
                   </div>
@@ -120,9 +125,13 @@ function GoalCard({
         <span className="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-md font-mono text-xs">
           {goal.kind === 'model' ? rank : <Icon className="size-3.5" />}
         </span>
-        <h2 className="text-base leading-snug font-medium">{goal.title}</h2>
+        <h2 className="text-base leading-snug font-medium">
+          <CodeText text={goal.title} />
+        </h2>
       </motion.div>
-      <p className="text-muted-foreground line-clamp-3 text-sm">{goal.description}</p>
+      <p className="text-muted-foreground line-clamp-3 text-sm">
+        <CodeText text={goal.description} />
+      </p>
       <div className="mt-auto flex items-center justify-between">
         <span className="text-muted-foreground text-xs">
           {goal.changes.length} {goal.changes.length === 1 ? 'change' : 'changes'} ·{' '}

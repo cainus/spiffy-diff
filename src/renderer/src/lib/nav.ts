@@ -1,3 +1,4 @@
+import { stripCode } from '@shared/code-spans'
 import type { Focus } from '@shared/focus'
 import type { Summary } from '@shared/summary'
 
@@ -94,10 +95,10 @@ export function breadcrumbs(state: NavState, summary: Summary | null): Crumb[] {
   if (!summary || path.level === 'source') return crumbs
   const goal = summary.goals.find((g) => g.id === path.goalId)
   if (!goal) return crumbs
-  crumbs.push({ label: goal.title, focus: { level: 'goal', goalId: goal.id } })
+  crumbs.push({ label: stripCode(goal.title), focus: { level: 'goal', goalId: goal.id } })
   if (path.level === 'change') {
     const change = goal.changes.find((c) => c.id === path.changeId)
-    if (change) crumbs.push({ label: change.title, focus: path })
+    if (change) crumbs.push({ label: stripCode(change.title), focus: path })
   }
   return crumbs
 }
