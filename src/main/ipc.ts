@@ -1,15 +1,15 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { dialog, ipcMain, type BrowserWindow } from 'electron'
-import type { UIMessage } from 'ai'
-import type { Focus } from '@shared/focus'
-import type { LoadRequest } from '@shared/ipc'
+import type { UIMessageChunk } from 'ai'
+import type { ChatTurnRequest, LoadRequest, SimplifyRequest } from '@shared/ipc'
 import type { Backend } from '@shared/source'
 import { createModel } from './core/backends'
 import { chatStream } from './core/chat'
 import { listBranches, loadBranchSource, repoName } from './core/git'
 import { findOpenPr, loadPrSource, runGh } from './core/github'
 import { Sessions } from './core/session'
+import { simplify } from './core/simplify'
 import { summarize } from './core/summarize'
 import { ensureWorkspace } from './core/workspace'
 
@@ -48,40 +48,52 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     ),
   )
 
-  const chats = new Map<string, AbortController>()
-  ipcMain.on(
-    'chat:start',
-    async (
-      e,
-      reqId: string,
-      req: { sessionId: string; backend: Backend; messages: UIMessage[]; focus: Focus },
-    ) => {
+  /** One IPC stream: `<name>:start` runs `produce`, and each value goes to `<name>:chunk`. */
+  const streams = new Map<string, AbortController>()
+  function serveStream<Req, Chunk>(
+    name: string,
+    produce: (req: Req, signal: AbortSignal) => Promise<AsyncIterable<Chunk>>,
+  ): void {
+    ipcMain.on(`${name}:start`, async (e, reqId: string, req: Req) => {
       const abort = new AbortController()
-      chats.set(reqId, abort)
+      streams.set(reqId, abort)
       try {
-        const session = sessions.get(req.sessionId)
-        const cwd = await sessions.workspace(req.sessionId)
-        const stream = await chatStream({
-          model: await createModel(req.backend, cwd),
-          source: session.source,
-          summary: session.summary ?? null,
-          messages: req.messages,
-          focus: req.focus,
-          abortSignal: abort.signal,
-        })
-        for await (const chunk of stream) {
+        for await (const chunk of await produce(req, abort.signal)) {
           if (abort.signal.aborted) break
-          e.sender.send('chat:chunk', reqId, chunk)
+          e.sender.send(`${name}:chunk`, reqId, chunk)
         }
-        e.sender.send('chat:end', reqId)
+        e.sender.send(`${name}:end`, reqId)
       } catch (err) {
-        if (!abort.signal.aborted) e.sender.send('chat:error', reqId, errorMessage(err))
+        if (!abort.signal.aborted) e.sender.send(`${name}:error`, reqId, errorMessage(err))
       } finally {
-        chats.delete(reqId)
+        streams.delete(reqId)
       }
-    },
-  )
-  ipcMain.on('chat:cancel', (_e, reqId: string) => chats.get(reqId)?.abort())
+    })
+    ipcMain.on(`${name}:cancel`, (_e, reqId: string) => streams.get(reqId)?.abort())
+  }
+
+  serveStream<ChatTurnRequest, UIMessageChunk>('chat', async (req, signal) => {
+    const session = sessions.get(req.sessionId)
+    const cwd = await sessions.workspace(req.sessionId)
+    return chatStream({
+      model: await createModel(req.backend, cwd),
+      source: session.source,
+      summary: session.summary ?? null,
+      messages: req.messages,
+      focus: req.focus,
+      abortSignal: signal,
+    })
+  })
+
+  serveStream<SimplifyRequest, string>('simplify', async (req, signal) => {
+    const cwd = await sessions.workspace(req.sessionId)
+    return simplify({
+      model: await createModel(req.backend, cwd),
+      title: req.title,
+      text: req.text,
+      abortSignal: signal,
+    })
+  })
 
   ipcMain.handle('repo:pick', async () => {
     const win = getWindow()

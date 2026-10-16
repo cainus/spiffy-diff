@@ -61,6 +61,10 @@ const summary: Summary = {
       ],
     },
   ],
+  terms: [
+    { term: 'retry', kind: 'jargon' },
+    { term: 'client', kind: 'code' },
+  ],
 }
 
 function fakeBridge(): SpiffyBridge {
@@ -70,6 +74,7 @@ function fakeBridge(): SpiffyBridge {
     chat: vi.fn(() => () => {}),
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
+    simplify: vi.fn(() => () => {}),
     linkRepo: vi.fn(async () => {}),
   }
 }
@@ -79,7 +84,10 @@ async function openPr() {
   render(<App />)
   await user.type(screen.getByPlaceholderText(/github.com/), 'https://github.com/o/r/pull/1')
   await user.click(screen.getByRole('button', { name: 'Explain' }))
-  await screen.findByText('The change adds retry to the client.')
+  // Terms split the overview into several elements. Match the whole paragraph.
+  await screen.findByText(
+    (_, el) => el?.tagName === 'P' && el.textContent === 'The change adds retry to the client.',
+  )
   return user
 }
 
@@ -155,5 +163,76 @@ describe('drilling out from the agent box', () => {
     await user.keyboard('{Escape}')
 
     expect(await screen.findByTitle('Overview')).toBeTruthy()
+  })
+})
+
+describe('terms', () => {
+  it('underlines terms in an explanation and asks the agent about a term you click', async () => {
+    const user = await openPr()
+
+    await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
+
+    await vi.waitFor(() =>
+      expect(bridge.chat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              parts: [
+                {
+                  type: 'text',
+                  text: 'Explain the code concept "client" in this repository. Find where it is defined and what uses it.',
+                },
+              ],
+            }),
+          ],
+        }),
+        expect.anything(),
+      ),
+    )
+  })
+})
+
+describe('ELI5', () => {
+  it('explains the overview again as for a child, below the overview', async () => {
+    bridge.simplify = vi.fn((_req, h) => {
+      queueMicrotask(() => {
+        h.onChunk('The app ')
+        h.onChunk('tries again.')
+        h.onEnd()
+      })
+      return () => {}
+    })
+    const user = await openPr()
+
+    await user.click(screen.getAllByRole('button', { name: 'Explain like I am five' })[0]!)
+
+    expect(await screen.findByText('The app tries again.')).toBeTruthy()
+    expect(bridge.simplify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 's1',
+        backend: 'claude',
+        text: 'The change adds retry to the client.',
+      }),
+      expect.anything(),
+    )
+  })
+
+  it('hides the simple explanation when you press the button again', async () => {
+    bridge.simplify = vi.fn((_req, h) => {
+      queueMicrotask(() => {
+        h.onChunk('Simple.')
+        h.onEnd()
+      })
+      return () => {}
+    })
+    const user = await openPr()
+    const button = screen.getAllByRole('button', { name: 'Explain like I am five' })[0]!
+    await user.click(button)
+    await screen.findByText('Simple.')
+
+    await user.click(button)
+
+    await vi.waitFor(() => expect(screen.queryByText('Simple.')).toBeNull())
+    expect(bridge.simplify).toHaveBeenCalledTimes(1)
   })
 })

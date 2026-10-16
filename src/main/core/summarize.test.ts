@@ -261,6 +261,19 @@ describe('summarize', () => {
     expect(summary.hunkNotes).toEqual({ h2: 'The client calls retry.' })
   })
 
+  it('asks the model to list technical jargon and internal code and business concepts', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () => streamJson(JSON.stringify(answer)),
+    })
+
+    await summarize(source, { model })
+
+    const prompt = JSON.stringify(model.doStreamCalls[0]!.prompt)
+    expect(prompt).toContain('technical jargon')
+    expect(prompt).toContain('internal code concepts')
+    expect(prompt).toContain('internal business concepts')
+  })
+
   it('tells the model to write in ASD-STE100', async () => {
     const model = new MockLanguageModelV4({
       doStream: async () => streamJson(JSON.stringify(answer)),

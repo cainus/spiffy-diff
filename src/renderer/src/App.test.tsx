@@ -74,6 +74,7 @@ function fakeBridge(): SpiffyBridge {
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
     linkRepo: vi.fn(async () => {}),
+    simplify: vi.fn(() => () => {}),
   }
 }
 
@@ -228,6 +229,42 @@ describe('drilling out', () => {
     await vi.waitFor(() =>
       expect(within(screen.getByRole('navigation')).queryByText('Retry failed calls')).toBeNull(),
     )
+  })
+})
+
+describe('opening a new source', () => {
+  it('ignores a summary that arrives late for a source that you closed', async () => {
+    const other: LoadedSource = {
+      ...source,
+      title: 'Second PR',
+      prUrl: 'https://github.com/o/r/pull/2',
+    }
+    let finishFirst: (s: Summary) => void = () => {}
+    window.spiffy.loadSource = vi
+      .fn()
+      .mockResolvedValueOnce({ sessionId: 's1', source })
+      .mockResolvedValueOnce({ sessionId: 's2', source: other })
+    window.spiffy.summarize = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<Summary>((r) => (finishFirst = r)))
+      .mockImplementationOnce(() => new Promise<Summary>(() => {}))
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByPlaceholderText(/github.com/), 'https://github.com/o/r/pull/1')
+    await user.click(screen.getByRole('button', { name: 'Explain' }))
+    await screen.findByRole('heading', { name: 'Add retry' })
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.type(
+      await screen.findByPlaceholderText(/github.com/),
+      'https://github.com/o/r/pull/2',
+    )
+    await user.click(screen.getByRole('button', { name: 'Explain' }))
+    await screen.findByRole('heading', { name: 'Second PR' })
+    finishFirst(summary)
+
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByRole('button', { name: /Retry failed calls/ })).toBeNull()
   })
 })
 

@@ -26,7 +26,7 @@ export interface CacheKeyParts {
 }
 
 /** Change this when the summary format changes. Then spiffy makes old summaries again. */
-const SUMMARY_VERSION = 'v2'
+const SUMMARY_VERSION = 'v3'
 
 /** The cache key for one summary. A new push or a new dirty tree gives a new key. */
 export function summaryCacheKey(p: CacheKeyParts): string {

@@ -38,6 +38,7 @@ Attach hunks to changes with their hunk IDs, for example "h3". Use only hunk IDs
 Attach every hunk to at least one change.
 Use the findings from the code to write why each change exists, not only what it does.
 Write one note for each hunk: what the hunk does and why.
+List the words in your text that a reader can ask about: technical jargon, internal code concepts (functions, models, modules, flags), and internal business concepts.
 
 ${STE_RULES}`
 

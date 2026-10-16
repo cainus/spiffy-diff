@@ -47,6 +47,11 @@ The app is not signed.
   - For a branch with an open pull request, spiffy uses the base and the text of that pull request.
   - "Include uncommitted changes" adds your working tree to the current branch.
 - Click a goal to drill in. Click a change to see its code.
+- **ELI5** beside an explanation asks the agent to explain it again as for a child. Click it again to hide it.
+- Underlined words are terms you can ask about. A click sends the question to the agent panel:
+  - dotted blue: technical jargon
+  - green, monospace: internal code concepts
+  - wavy amber: internal business concepts
 - Press **Esc** or **Backspace** to drill out. Click a breadcrumb to jump to a level.
 - **Summary / Files** switches the view.
 - **Claude / Codex** selects the agent. A change makes the summary again.

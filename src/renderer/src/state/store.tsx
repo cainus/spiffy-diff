@@ -18,6 +18,10 @@ export interface AppState {
   summary: Summary | null
   partial: DeepPartial<ModelSummary> | null
   progress: SummaryProgress | null
+  /** A question for the agent panel from outside it, for example a term click. */
+  question: { id: number; text: string } | null
+  /** The number of the latest summary run. */
+  runId: number
   backend: Backend
   nav: NavState
 }
@@ -25,11 +29,12 @@ export interface AppState {
 type Action =
   | { type: 'loading' }
   | { type: 'loaded'; sessionId: string; source: LoadedSource }
-  | { type: 'summarizing' }
-  | { type: 'partial'; partial: DeepPartial<ModelSummary> }
-  | { type: 'progress'; progress: SummaryProgress }
-  | { type: 'summary'; summary: Summary }
-  | { type: 'error'; error: string }
+  | { type: 'summarizing'; runId: number }
+  | { type: 'partial'; partial: DeepPartial<ModelSummary>; runId: number }
+  | { type: 'progress'; progress: SummaryProgress; runId: number }
+  | { type: 'ask'; text: string }
+  | { type: 'summary'; summary: Summary; runId: number }
+  | { type: 'error'; error: string; runId?: number }
   | { type: 'backend'; backend: Backend }
   | { type: 'close' }
   | { type: 'nav'; action: NavAction }
@@ -42,11 +47,21 @@ const initial: AppState = {
   summary: null,
   partial: null,
   progress: null,
+  question: null,
+  runId: 0,
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
 }
 
 function reducer(state: AppState, action: Action): AppState {
+  if (
+    'runId' in action &&
+    action.type !== 'summarizing' &&
+    action.runId !== undefined &&
+    action.runId !== state.runId
+  ) {
+    return state
+  }
   switch (action.type) {
     case 'loading':
       return { ...initial, backend: state.backend, status: 'loading' }
@@ -55,6 +70,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'summarizing':
       return {
         ...state,
+        runId: action.runId,
         status: 'summarizing',
         summary: null,
         partial: null,
@@ -62,6 +78,8 @@ function reducer(state: AppState, action: Action): AppState {
         error: null,
         nav: initialNav,
       }
+    case 'ask':
+      return { ...state, question: { id: (state.question?.id ?? 0) + 1, text: action.text } }
     case 'progress':
       return { ...state, progress: action.progress }
     case 'partial':
@@ -86,18 +104,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     latest.current = state
   })
 
+  // Each summary run has a number. The reducer drops results of a run that is not the latest,
+  // for example when you open a new source before the old summary is done.
+  const runs = useRef(0)
   const run = useCallback(async (sessionId: string, backend: Backend) => {
-    dispatch({ type: 'summarizing' })
+    const runId = ++runs.current
+    dispatch({ type: 'summarizing', runId })
     try {
       const summary = await window.spiffy.summarize(
         sessionId,
         backend,
-        (partial) => dispatch({ type: 'partial', partial }),
-        (progress) => dispatch({ type: 'progress', progress }),
+        (partial) => dispatch({ type: 'partial', partial, runId }),
+        (progress) => dispatch({ type: 'progress', progress, runId }),
       )
-      dispatch({ type: 'summary', summary })
+      dispatch({ type: 'summary', summary, runId })
     } catch (e) {
-      dispatch({ type: 'error', error: errorText(e) })
+      dispatch({ type: 'error', error: errorText(e), runId })
     }
   }, [])
 
@@ -144,6 +166,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setBackend,
       close: () => dispatch({ type: 'close' }),
       nav$: (action) => dispatch({ type: 'nav', action }),
+      ask: (text) => dispatch({ type: 'ask', text }),
     }),
     [state, owners, open, resummarize, setBackend],
   )

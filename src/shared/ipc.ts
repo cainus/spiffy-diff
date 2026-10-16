@@ -21,6 +21,13 @@ export interface ChatTurnRequest {
   focus: Focus
 }
 
+export interface SimplifyRequest {
+  sessionId: string
+  backend: Backend
+  title: string
+  text: string
+}
+
 export interface StreamHandlers<T> {
   onChunk: (chunk: T) => void
   onEnd: () => void
@@ -44,6 +51,8 @@ export interface SpiffyBridge {
   chat(req: ChatTurnRequest, handlers: StreamHandlers<UIMessageChunk>): () => void
   pickRepoFolder(): Promise<string | null>
   listBranches(repoPath: string): Promise<BranchList>
+  /** Explain a text again as for a child (ELI5). The chunks are text. */
+  simplify(req: SimplifyRequest, handlers: StreamHandlers<string>): () => void
   /** Use a local copy of the repository as the agent's workspace. */
   linkRepo(sessionId: string, repoPath: string): Promise<void>
 }

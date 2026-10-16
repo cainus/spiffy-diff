@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Crosshair, Sparkles } from 'lucide-react'
@@ -54,6 +54,15 @@ export function AgentPanel() {
   const ask = (text: string) => {
     if (text.trim()) void sendMessage({ text })
   }
+
+  // Questions from outside the panel, for example a click on a term.
+  const answered = useRef(0)
+  useEffect(() => {
+    const q = store.question
+    if (!q || q.id <= answered.current) return
+    answered.current = q.id
+    void sendMessage({ text: q.text })
+  }, [store.question, sendMessage])
 
   return (
     <div className="bg-sidebar/30 flex h-full flex-col">

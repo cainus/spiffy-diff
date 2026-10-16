@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { itemVariants, spring } from '@/lib/motion'
 import { groupByFile, lineStats } from '@/lib/stats'
 import { useStore } from '@/state/use-store'
+import { Explained } from '@/components/explained'
 import { LineStats } from './line-stats'
 
 export function ChangeLevel({
@@ -38,7 +39,7 @@ export function ChangeLevel({
           <motion.h1 layout="position" className="text-xl font-semibold tracking-tight">
             {change.title}
           </motion.h1>
-          {change.description && <p className="text-foreground/80">{change.description}</p>}
+          {change.description && <Explained title={change.title} text={change.description} />}
           <LineStats stats={lineStats(change.hunkIds, index)} />
         </motion.header>
 

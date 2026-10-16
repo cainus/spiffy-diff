@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { itemVariants, spring } from '@/lib/motion'
 import { lineStats } from '@/lib/stats'
 import { useStore } from '@/state/use-store'
+import { Explained } from '@/components/explained'
 import { LineStats } from './line-stats'
 
 export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk> }) {
@@ -21,7 +22,7 @@ export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk
           <motion.h1 layout="position" className="text-2xl font-semibold tracking-tight">
             {goal.title}
           </motion.h1>
-          <p className="text-foreground/80 leading-relaxed">{goal.description}</p>
+          <Explained title={goal.title} text={goal.description} />
         </motion.header>
 
         <div className="relative space-y-3 pl-6">

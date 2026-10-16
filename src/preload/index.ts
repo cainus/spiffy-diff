@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { UIMessageChunk } from 'ai'
-import type { SpiffyBridge } from '@shared/ipc'
+import type { SpiffyBridge, StreamHandlers } from '@shared/ipc'
 import type { SummaryProgress } from '@shared/progress'
 
 let nextId = 0
@@ -16,6 +16,27 @@ function listen<A extends unknown[]>(
   }
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.removeListener(channel, handler)
+}
+
+function stream<T>(name: string, req: unknown, handlers: StreamHandlers<T>): () => void {
+  const reqId = newId()
+  const stops = [
+    listen(`${name}:chunk`, reqId, (chunk: T) => handlers.onChunk(chunk)),
+    listen(`${name}:end`, reqId, () => {
+      stopAll()
+      handlers.onEnd()
+    }),
+    listen(`${name}:error`, reqId, (message: string) => {
+      stopAll()
+      handlers.onError(message)
+    }),
+  ]
+  const stopAll = (): void => stops.forEach((s) => s())
+  ipcRenderer.send(`${name}:start`, reqId, req)
+  return () => {
+    stopAll()
+    ipcRenderer.send(`${name}:cancel`, reqId)
+  }
 }
 
 const api: SpiffyBridge = {
@@ -34,26 +55,8 @@ const api: SpiffyBridge = {
     }
   },
 
-  chat(req, handlers) {
-    const reqId = newId()
-    const stops = [
-      listen('chat:chunk', reqId, (chunk: UIMessageChunk) => handlers.onChunk(chunk)),
-      listen('chat:end', reqId, () => {
-        stopAll()
-        handlers.onEnd()
-      }),
-      listen('chat:error', reqId, (message: string) => {
-        stopAll()
-        handlers.onError(message)
-      }),
-    ]
-    const stopAll = (): void => stops.forEach((s) => s())
-    ipcRenderer.send('chat:start', reqId, req)
-    return () => {
-      stopAll()
-      ipcRenderer.send('chat:cancel', reqId)
-    }
-  },
+  chat: (req, handlers) => stream<UIMessageChunk>('chat', req, handlers),
+  simplify: (req, handlers) => stream<string>('simplify', req, handlers),
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
   listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),

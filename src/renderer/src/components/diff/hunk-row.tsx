@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { filePatch, type DiffFile } from '@shared/diff'
 import { PatchView } from '@/components/diff/patch-view'
+import { TermText } from '@/components/explained'
 import { useStore } from '@/state/use-store'
 
 interface HunkRowProps {
@@ -29,7 +30,11 @@ export function HunkRow({ file, hunkId, delay, diffStyle, header }: HunkRowProps
         transition={{ delay: delay / 1000 + 0.1, duration: 0.25 }}
         className="text-muted-foreground sticky top-4 border-l pl-3 text-sm leading-relaxed"
       >
-        {note ?? <span className="italic opacity-60">No note for this hunk.</span>}
+        {note ? (
+          <TermText text={note} />
+        ) : (
+          <span className="italic opacity-60">No note for this hunk.</span>
+        )}
       </motion.aside>
     </section>
   )

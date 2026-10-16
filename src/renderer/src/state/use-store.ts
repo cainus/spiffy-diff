@@ -12,6 +12,8 @@ export interface Store extends AppState {
   setBackend: (backend: Backend) => void
   close: () => void
   nav$: (action: NavAction) => void
+  /** Send a question to the agent panel. */
+  ask: (text: string) => void
 }
 
 export const StoreContext = createContext<Store | null>(null)

@@ -9,6 +9,7 @@ import { itemVariants, spring } from '@/lib/motion'
 import { lineStats } from '@/lib/stats'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/state/use-store'
+import { Explained } from '@/components/explained'
 import { LineStats } from './line-stats'
 
 export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
@@ -27,7 +28,15 @@ export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
             {source?.dirtyHash && <Badge variant="outline">Includes uncommitted changes</Badge>}
           </div>
           {overview ? (
-            <p className="text-foreground/80 max-w-3xl text-lg leading-relaxed">{overview}</p>
+            summary ? (
+              <Explained
+                title={source?.title ?? ''}
+                text={overview}
+                className="max-w-3xl text-lg"
+              />
+            ) : (
+              <p className="text-foreground/80 max-w-3xl text-lg leading-relaxed">{overview}</p>
+            )
           ) : (
             status === 'summarizing' && (
               <Shimmer className="text-lg">The agent reads the changes…</Shimmer>
