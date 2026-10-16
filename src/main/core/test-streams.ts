@@ -1,7 +1,7 @@
 import { simulateReadableStream } from 'ai'
 
 /** Mock model streams and answers for the tests of the model passes. */
-export const usage = {
+const usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 1, text: 1, reasoning: undefined },
 }
