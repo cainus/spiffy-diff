@@ -185,39 +185,6 @@ describe('hunk notes', () => {
   })
 })
 
-describe('terms', () => {
-  it('keeps the terms that appear in the summary text, once each', () => {
-    const summary = buildSummary(
-      {
-        overview: 'The PA queue gets fewer tasks.',
-        goals: [
-          {
-            title: 'Gate the fallback',
-            description: 'removal_owed checks the flag.',
-            changes: [{ title: 'c', description: '', hunkIds: ['h1', 'h2', 'h3'] }],
-          },
-        ],
-        hunkNotes: [{ hunkId: 'h1', note: 'A migration rewrites the tags.' }],
-        terms: [
-          { term: 'PA queue', kind: 'business' },
-          { term: 'removal_owed', kind: 'code' },
-          { term: 'migration', kind: 'jargon' },
-          { term: 'pa queue', kind: 'business' },
-          { term: 'never used', kind: 'jargon' },
-          { term: '  ', kind: 'jargon' },
-        ],
-      },
-      files,
-    )
-
-    expect(summary.terms).toEqual([
-      { term: 'PA queue', kind: 'business' },
-      { term: 'removal_owed', kind: 'code' },
-      { term: 'migration', kind: 'jargon' },
-    ])
-  })
-})
-
 describe('hunkOwners', () => {
   it('lists every goal and change that owns each hunk', () => {
     const summary = buildSummary(

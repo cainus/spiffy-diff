@@ -10,7 +10,7 @@ import { chatStream } from './core/chat'
 import { listBranches, loadBranchSource, repoName } from './core/git'
 import { findOpenPr, loadPrSource, runGh } from './core/github'
 import { Sessions } from './core/session'
-import { explainTerm } from './core/explain-term'
+import { explainTerm, whenExplained } from './core/explain-term'
 import { simplify } from './core/simplify'
 import { summarize } from './core/summarize'
 import { ensureWorkspace } from './core/workspace'
@@ -100,15 +100,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   serveStream<TermRequest, TermEvent>('term', async (req, signal) => {
     const session = sessions.get(req.sessionId)
     const cwd = await sessions.workspace(req.sessionId)
-    return explainTerm({
+    const events = explainTerm({
       model: await createModel(req.backend, cwd),
       cwd,
       title: session.source.title,
-      term: req.term,
+      phrase: req.phrase,
       context: req.context,
       abortSignal: signal,
     })
+    return whenExplained(events, (text) =>
+      sessions.rememberExplanation(req.sessionId, req.phrase, text),
+    )
   })
+  ipcMain.handle('explanations', (_e, sessionId: string) => sessions.explanations(sessionId))
 
   ipcMain.handle('repo:pick', async () => {
     const win = getWindow()

@@ -51,7 +51,7 @@ describe('summaryCacheKey', () => {
         dirtyHash: null,
         backend: 'claude',
       }),
-    ).toMatch(/^v3-/)
+    ).toMatch(/^v4-/)
   })
 
   it('is safe to use as a file name', () => {

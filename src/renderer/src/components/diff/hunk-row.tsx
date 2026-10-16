@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { filePatch, type DiffFile } from '@shared/diff'
 import { PatchView } from '@/components/diff/patch-view'
-import { TermText } from '@/components/explained'
+import { PhraseText } from '@/components/explain/phrase-text'
 import { useStore } from '@/state/use-store'
 
 interface HunkRowProps {
@@ -31,7 +31,7 @@ export function HunkRow({ file, hunkId, delay, diffStyle, header }: HunkRowProps
         className="text-muted-foreground sticky top-4 border-l pl-3 text-sm leading-relaxed"
       >
         {note ? (
-          <TermText text={note} />
+          <PhraseText text={note} />
         ) : (
           <span className="italic opacity-60">No note for this hunk.</span>
         )}

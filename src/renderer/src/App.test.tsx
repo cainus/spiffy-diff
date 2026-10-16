@@ -76,6 +76,7 @@ function fakeBridge(): SpiffyBridge {
     linkRepo: vi.fn(async () => {}),
     simplify: vi.fn(() => () => {}),
     explainTerm: vi.fn(() => () => {}),
+    explanations: vi.fn(async () => ({})),
   }
 }
 

@@ -129,6 +129,51 @@ describe('Sessions', () => {
     )
   })
 
+  it('remembers explained phrases for the same source, across sessions', async () => {
+    const d = deps()
+    const first = new Sessions(d)
+    const { sessionId } = await first.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+    expect(await first.explanations(sessionId)).toEqual({})
+
+    await first.rememberExplanation(sessionId, 'PA queue', 'The queue of manual tasks.')
+    await first.rememberExplanation(sessionId, 'pa  QUEUE', 'A newer answer.')
+    const second = new Sessions(d)
+    const again = await second.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+
+    expect(await second.explanations(again.sessionId)).toEqual({
+      'pa queue': { phrase: 'pa  QUEUE', text: 'A newer answer.' },
+    })
+  })
+
+  it('shares explanations with later PRs and branches of the same repository', async () => {
+    const d = deps()
+    const sessions = new Sessions(d)
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+    await sessions.rememberExplanation(sessionId, 'PA', 'A privacy advisor.')
+
+    const later = new Sessions({
+      ...d,
+      loadPr: async () => ({ ...source, headSha: 'h2', prUrl: 'https://github.com/o/r/pull/9' }),
+    })
+    const next = await later.load({ kind: 'pr', url: 'https://github.com/o/r/pull/9' })
+
+    expect(await later.explanations(next.sessionId)).toEqual({
+      pa: { phrase: 'PA', text: 'A privacy advisor.' },
+    })
+  })
+
+  it('keeps explanations apart for a different repository', async () => {
+    const d = deps()
+    const sessions = new Sessions(d)
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+    await sessions.rememberExplanation(sessionId, 'PA', 'x')
+
+    const other = new Sessions({ ...d, loadPr: async () => ({ ...source, repo: 'o/other' }) })
+    const next = await other.load({ kind: 'pr', url: 'https://github.com/o/other/pull/1' })
+
+    expect(await other.explanations(next.sessionId)).toEqual({})
+  })
+
   it('rejects an unknown session ID', async () => {
     await expect(new Sessions(deps()).workspace('nope')).rejects.toThrow(/unknown session/i)
   })

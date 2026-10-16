@@ -6,6 +6,7 @@ import type { LoadRequest, LoadResult } from '@shared/ipc'
 import type { SummaryProgress } from '@shared/progress'
 import { parsePrUrl, summaryCacheKey, type Backend, type LoadedSource } from '@shared/source'
 import type { ModelSummary, Summary } from '@shared/summary'
+import { phraseKey, type Explanation } from '@shared/terms'
 import { readCachedSummary, writeCachedSummary } from './cache'
 import type { WorkspaceRequest } from './workspace'
 
@@ -75,6 +76,33 @@ export class Sessions {
     }
     await this.rememberRepo(name, path)
     session.workspace = undefined
+  }
+
+  /** The phrases that the user had explained in this repository. The key is `phraseKey(phrase)`. */
+  async explanations(sessionId: string): Promise<Record<string, Explanation>> {
+    try {
+      return JSON.parse(await readFile(this.explanationsFile(sessionId), 'utf8')) as Record<
+        string,
+        Explanation
+      >
+    } catch {
+      return {}
+    }
+  }
+
+  async rememberExplanation(sessionId: string, phrase: string, text: string): Promise<void> {
+    const all = await this.explanations(sessionId)
+    await mkdir(join(this.deps.home, 'explanations'), { recursive: true })
+    await writeFile(
+      this.explanationsFile(sessionId),
+      JSON.stringify({ ...all, [phraseKey(phrase)]: { phrase, text } }),
+    )
+  }
+
+  private explanationsFile(sessionId: string): string {
+    const { source } = this.get(sessionId)
+    // Explanations describe the repository, so later PRs and branches of the same repository reuse them.
+    return join(this.deps.home, 'explanations', `${source.repo.replace(/[^\w.-]/g, '_')}.json`)
   }
 
   async summarize(

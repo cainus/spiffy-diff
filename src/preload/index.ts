@@ -59,6 +59,7 @@ const api: SpiffyBridge = {
   chat: (req, handlers) => stream<UIMessageChunk>('chat', req, handlers),
   simplify: (req, handlers) => stream<string>('simplify', req, handlers),
   explainTerm: (req, handlers) => stream<TermEvent>('term', req, handlers),
+  explanations: (sessionId) => ipcRenderer.invoke('explanations', sessionId),
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
   listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),

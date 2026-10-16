@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { DiffFile } from './diff'
 import { isNoise } from './noise'
-import { splitTerms, type Term } from './terms'
 
 export const OTHER_GOAL_TITLE = 'Other changes'
 export const NOISE_GOAL_TITLE = 'Generated & lockfiles'
@@ -39,17 +38,6 @@ export const modelSummarySchema = z.object({
     )
     .optional()
     .describe('One note for each hunk.'),
-  terms: z
-    .array(
-      z.object({
-        term: z.string().describe('The exact words as they appear in your text.'),
-        kind: z.enum(['jargon', 'code', 'business']),
-      }),
-    )
-    .optional()
-    .describe(
-      'Words in your text that a reader can ask about: technical jargon (jargon), internal code concepts such as functions, models, and modules (code), and internal business concepts (business).',
-    ),
 })
 
 export type ModelSummary = z.infer<typeof modelSummarySchema>
@@ -76,8 +64,6 @@ export interface Summary {
   goals: Goal[]
   /** One explanation for each hunk ID. Summaries in an old format have none. */
   hunkNotes?: Record<string, string>
-  /** Words in the summary text that a reader can ask about. */
-  terms?: Term[]
 }
 
 interface DraftGoal {
@@ -145,27 +131,7 @@ export function buildSummary(model: ModelSummary, files: DiffFile[]): Summary {
     if (reviewable.has(n.hunkId) && n.note.trim()) hunkNotes[n.hunkId] = n.note.trim()
   }
 
-  const text = [
-    model.overview,
-    ...goals.flatMap((g) => [
-      g.title,
-      g.description,
-      ...g.changes.flatMap((c) => [c.title, c.description]),
-    ]),
-    ...Object.values(hunkNotes),
-  ].join('\n')
-  const terms: Term[] = []
-  const seen = new Set<string>()
-  for (const t of model.terms ?? []) {
-    const term = { term: t.term.trim(), kind: t.kind }
-    const key = term.term.toLowerCase()
-    if (!term.term || seen.has(key)) continue
-    if (!splitTerms(text, [term]).some((p) => p.term)) continue
-    seen.add(key)
-    terms.push(term)
-  }
-
-  return { overview: model.overview, goals, hunkNotes, terms }
+  return { overview: model.overview, goals, hunkNotes }
 }
 
 export interface HunkOwner {

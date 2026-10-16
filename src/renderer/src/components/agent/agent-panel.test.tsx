@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseDiff } from '@shared/diff'
@@ -62,10 +62,6 @@ const summary: Summary = {
       ],
     },
   ],
-  terms: [
-    { term: 'retry', kind: 'jargon' },
-    { term: 'client', kind: 'code' },
-  ],
 }
 
 function fakeBridge(): SpiffyBridge {
@@ -77,6 +73,7 @@ function fakeBridge(): SpiffyBridge {
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
     simplify: vi.fn(() => () => {}),
     explainTerm: vi.fn(() => () => {}),
+    explanations: vi.fn(async () => ({})),
     linkRepo: vi.fn(async () => {}),
   }
 }
@@ -168,41 +165,64 @@ describe('drilling out from the agent box', () => {
   })
 })
 
-describe('terms', () => {
+describe('explaining a selection', () => {
   function explainWith(answers: Record<string, TermEvent[]>) {
     const pending: Record<string, () => void> = {}
     bridge.explainTerm = vi.fn((req, h) => {
-      const events = answers[req.term.term] ?? []
-      pending[req.term.term] = () => {
+      const events = answers[req.phrase] ?? []
+      pending[req.phrase] = () => {
         for (const e of events) h.onChunk(e)
         h.onEnd()
       }
       return () => {}
     })
-    return (term: string) => act(() => pending[term]!())
+    return (phrase: string) => act(() => pending[phrase]!())
   }
 
-  it('explains a term in a popup with a progress indicator, not in the agent panel', async () => {
+  function select(container: HTMLElement, phrase: string) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const at = node.textContent!.indexOf(phrase)
+      if (at === -1) continue
+      const range = document.createRange()
+      range.setStart(node, at)
+      range.setEnd(node, at + phrase.length)
+      const sel = window.getSelection()!
+      sel.removeAllRanges()
+      sel.addRange(range)
+      fireEvent.mouseUp(node.parentElement!)
+      return
+    }
+    throw new Error(`"${phrase}" is not in the container`)
+  }
+
+  const overview = () =>
+    screen.getByText(
+      (_, el) => el?.tagName === 'P' && el.textContent === 'The change adds retry to the client.',
+    )
+
+  it('explains selected text in a popup with a progress indicator, not in the agent panel', async () => {
     const finish = explainWith({
-      client: [
+      retry: [
         { type: 'activity', text: 'Reading src/client.ts' },
-        { type: 'text', delta: 'The client sends [[HTTP|jargon]] calls.' },
+        { type: 'text', delta: 'Retry runs a failed call again.' },
       ],
     })
     const user = await openPr()
 
-    await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
 
-    const popup = await screen.findByRole('dialog', { name: 'client' })
-    expect(within(popup).getByRole('status').textContent).toContain('The agent reads the code')
-    finish('client')
-    await vi.waitFor(() => expect(popup.textContent).toContain('The client sends HTTP calls.'))
+    const popup = await screen.findByRole('dialog', { name: 'retry' })
+    await vi.waitFor(() => expect(within(popup).getByRole('status')).toBeTruthy())
+    finish('retry')
+    await vi.waitFor(() => expect(popup.textContent).toContain('Retry runs a failed call again.'))
     expect(within(popup).queryByRole('status')).toBeNull()
     expect(bridge.explainTerm).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: 's1',
         backend: 'claude',
-        term: { term: 'client', kind: 'code' },
+        phrase: 'retry',
         context: 'The change adds retry to the client.',
       }),
       expect.anything(),
@@ -210,37 +230,14 @@ describe('terms', () => {
     expect(bridge.chat).not.toHaveBeenCalled()
   })
 
-  it('shows the same explanation at once when you open the term again', async () => {
-    const finish = explainWith({ client: [{ type: 'text', delta: 'The client sends calls.' }] })
-    const user = await openPr()
-    const word = screen.getByRole('button', { name: 'Ask about the code concept client' })
-    await user.click(word)
-    finish('client')
-    await vi.waitFor(() =>
-      expect(screen.getByRole('dialog', { name: 'client' }).textContent).toContain(
-        'The client sends calls.',
-      ),
-    )
-
-    await user.keyboard('{Escape}')
-    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    await user.click(word)
-
-    expect((await screen.findByRole('dialog', { name: 'client' })).textContent).toContain(
-      'The client sends calls.',
-    )
-    expect(bridge.explainTerm).toHaveBeenCalledTimes(1)
-  })
-
   it('shows what the agent reads while it works', async () => {
-    explainWith({ client: [] })
     bridge.explainTerm = vi.fn((_req, h) => {
       queueMicrotask(() => h.onChunk({ type: 'activity', text: 'Reading src/client.ts' }))
       return () => {}
     })
     const user = await openPr()
-
-    await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
+    select(overview(), 'client')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
 
     const popup = await screen.findByRole('dialog', { name: 'client' })
     await vi.waitFor(() =>
@@ -248,37 +245,90 @@ describe('terms', () => {
     )
   })
 
-  it('underlines terms in the popup, and explains them in the same popup with a way back', async () => {
+  it('underlines an explained phrase afterward, and a click shows the saved answer at once', async () => {
     const finish = explainWith({
-      client: [{ type: 'text', delta: 'The client sends [[HTTP|jargon]] calls.' }],
-      HTTP: [{ type: 'text', delta: 'HTTP is how programs talk on the web.' }],
+      retry: [{ type: 'text', delta: 'Retry runs a failed call again.' }],
     })
     const user = await openPr()
-    await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
-    const popup = await screen.findByRole('dialog', { name: 'client' })
-    finish('client')
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('retry')
+    await vi.waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('Retry runs'))
+    await user.keyboard('{Escape}')
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    await user.click(
-      await within(popup).findByRole('button', { name: 'Ask about the technical term HTTP' }),
-    )
-    finish('HTTP')
+    await user.click(await screen.findByRole('button', { name: 'Explain retry' }))
 
-    const inner = await screen.findByRole('dialog', { name: 'HTTP' })
-    await vi.waitFor(() =>
-      expect(inner.textContent).toContain('HTTP is how programs talk on the web.'),
+    expect((await screen.findByRole('dialog', { name: 'retry' })).textContent).toContain(
+      'Retry runs a failed call again.',
     )
+    expect(bridge.explainTerm).toHaveBeenCalledTimes(1)
+  })
+
+  it('underlines the explanations that were saved before', async () => {
+    bridge.explanations = vi.fn(async () => ({
+      client: { phrase: 'client', text: 'The client calls the API.' },
+    }))
+    const user = await openPr()
+
+    await user.click(await screen.findByRole('button', { name: 'Explain client' }))
+
+    expect((await screen.findByRole('dialog', { name: 'client' })).textContent).toContain(
+      'The client calls the API.',
+    )
+    expect(bridge.explanations).toHaveBeenCalledWith('s1')
+    expect(bridge.explainTerm).not.toHaveBeenCalled()
+  })
+
+  it('explains text that you select in the popup, in the same popup, with a way back', async () => {
+    const finish = explainWith({
+      retry: [{ type: 'text', delta: 'Retry uses backoff between calls.' }],
+      backoff: [{ type: 'text', delta: 'Backoff waits longer each time.' }],
+    })
+    const user = await openPr()
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('retry')
+    const popup = await screen.findByRole('dialog', { name: 'retry' })
+    await vi.waitFor(() => expect(popup.textContent).toContain('backoff'))
+
+    select(popup, 'backoff')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('backoff')
+
+    const inner = await screen.findByRole('dialog', { name: 'backoff' })
+    await vi.waitFor(() => expect(inner.textContent).toContain('Backoff waits longer each time.'))
     expect(bridge.explainTerm).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        term: { term: 'HTTP', kind: 'jargon' },
-        context: 'The client sends HTTP calls.',
-      }),
+      expect.objectContaining({ phrase: 'backoff', context: 'Retry uses backoff between calls.' }),
       expect.anything(),
     )
+    await user.click(within(inner).getByRole('button', { name: 'Back to retry' }))
+    expect((await screen.findByRole('dialog', { name: 'retry' })).textContent).toContain(
+      'Retry uses backoff',
+    )
+  })
 
-    await user.click(within(inner).getByRole('button', { name: 'Back to client' }))
+  it('explains the phrase again with the refresh button', async () => {
+    let answer = 'First answer.'
+    bridge.explainTerm = vi.fn((_req, h) => {
+      const text = answer
+      queueMicrotask(() => {
+        h.onChunk({ type: 'text', delta: text })
+        h.onEnd()
+      })
+      return () => {}
+    })
+    const user = await openPr()
+    select(overview(), 'retry')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    const popup = await screen.findByRole('dialog', { name: 'retry' })
+    await vi.waitFor(() => expect(popup.textContent).toContain('First answer.'))
 
-    const back = await screen.findByRole('dialog', { name: 'client' })
-    expect(back.textContent).toContain('The client sends HTTP calls.')
+    answer = 'Second answer.'
+    await user.click(within(popup).getByRole('button', { name: 'Explain again' }))
+
+    await vi.waitFor(() => expect(popup.textContent).toContain('Second answer.'))
+    expect(popup.textContent).not.toContain('First answer.')
     expect(bridge.explainTerm).toHaveBeenCalledTimes(2)
   })
 })

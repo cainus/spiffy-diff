@@ -1,32 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Baby, Loader2 } from 'lucide-react'
-import { splitTerms } from '@shared/terms'
-import { TermButton } from '@/components/term-popup'
+import { PhraseText } from '@/components/explain/phrase-text'
 import { errorText } from '@/lib/errors'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/state/use-store'
 
-/** Text with underlined terms. A click on a term opens a popup where the agent explains it. */
-export function TermText({ text }: { text: string }) {
-  const { summary } = useStore()
-  return (
-    <>
-      {splitTerms(text, summary?.terms ?? []).map((part, i) =>
-        part.term ? (
-          <TermButton key={i} term={part.term} context={text}>
-            {part.text}
-          </TermButton>
-        ) : (
-          <span key={i}>{part.text}</span>
-        ),
-      )}
-    </>
-  )
-}
-
-/** An explanation with underlined terms and an ELI5 button that asks the agent to explain it as for a child. */
+/** An explanation that you can select to explain, with an ELI5 button that asks the agent to explain it as for a child. */
 export function Explained({
   title,
   text,
@@ -66,7 +47,7 @@ export function Explained({
     <div className={cn('space-y-2', className)}>
       <div className="flex items-start gap-2">
         <p className="text-foreground/80 flex-1 leading-relaxed">
-          <TermText text={text} />
+          <PhraseText text={text} />
         </p>
         <motion.button
           type="button"

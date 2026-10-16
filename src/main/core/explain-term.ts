@@ -1,6 +1,6 @@
 import { relative } from 'node:path'
 import { streamText, type LanguageModel } from 'ai'
-import type { Term, TermEvent } from '@shared/terms'
+import type { TermEvent } from '@shared/terms'
 import { STE_RULES } from './style'
 
 export interface ExplainTermRequest {
@@ -9,25 +9,17 @@ export interface ExplainTermRequest {
   cwd: string
   /** The title of the source. */
   title: string
-  term: Term
-  /** The text where the user found the term. */
+  /** The text that the user selected. */
+  phrase: string
+  /** The text where the user found the phrase. */
   context: string
   abortSignal?: AbortSignal
 }
 
-const KIND = {
-  jargon: 'technical term',
-  code: 'code concept',
-  business: 'business concept',
-} as const
-
-const SYSTEM = `You explain one term to a code reviewer in a short popup.
-Your working directory has the code of the change. Use the Read, Grep, and Glob tools when the term is part of this code base or this business.
+const SYSTEM = `You explain one phrase to a code reviewer in a short popup.
+The phrase can be a technical term, a concept of this code base, or a concept of this business.
+Your working directory has the code of the change. Use the Read, Grep, and Glob tools when the phrase is part of this code base or this business.
 Then write only the explanation: two to five short sentences. Do not tell about your search. Do not use Markdown or headings.
-Mark each term in your explanation that a reader can ask about, in the form [[term|kind]].
-The kind is jargon (a technical term), code (a concept of this code base), or business (a concept of this business).
-Example: A [[migration|jargon]] adds rows to [[TaskTarget|code]] for each [[PA|business]].
-Mark every name from the code and every business term that you use, not only some. Do not mark the term that you explain.
 
 ${STE_RULES}`
 
@@ -45,19 +37,18 @@ function describeTool(name: string, input: unknown, cwd: string): string | null 
   return null
 }
 
-/** Explain a term. Yields what the agent reads, then the explanation text with [[term|kind]] markers. */
+/** Explain a phrase. Yields what the agent reads, then the explanation text. */
 export async function* explainTerm(req: ExplainTermRequest): AsyncGenerator<TermEvent> {
-  const { term } = req
   const result = streamText({
     model: req.model,
     system: SYSTEM,
     abortSignal: req.abortSignal,
     prompt: `Source: ${req.title}
 
-The reader found this ${KIND[term.kind]} in this text:
+The reader selected a phrase in this text:
 ${req.context}
 
-Explain the ${KIND[term.kind]} "${term.term}".`,
+Explain the phrase "${req.phrase}".`,
   })
   let wrote = false
   for await (const part of result.fullStream) {
@@ -73,4 +64,18 @@ Explain the ${KIND[term.kind]} "${term.term}".`,
       yield { type: 'text', delta: part.text }
     }
   }
+}
+
+/** Pass the events through. When the stream ends, give the final explanation text to `onDone`. */
+export async function* whenExplained(
+  events: AsyncIterable<TermEvent>,
+  onDone: (text: string) => Promise<void>,
+): AsyncGenerator<TermEvent> {
+  let text = ''
+  for await (const e of events) {
+    if (e.type === 'reset') text = ''
+    else if (e.type === 'text') text += e.delta
+    yield e
+  }
+  if (text.trim()) await onDone(text.trim())
 }
