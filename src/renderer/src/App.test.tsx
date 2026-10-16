@@ -408,6 +408,51 @@ describe('new versions of the source', () => {
 })
 
 describe('resuming', () => {
+  it('never shows the start screen while it opens the last source', async () => {
+    localStorage.setItem(
+      'spiffy.last',
+      JSON.stringify({
+        request: { kind: 'pr', url: 'https://github.com/o/r/pull/1' },
+        nav: { mode: 'summary', path: { level: 'source' }, file: null, direction: 1, cursor: null },
+      }),
+    )
+    let finish: () => void = () => {}
+    window.spiffy.loadSource = vi.fn(
+      () =>
+        new Promise<{ sessionId: string; source: LoadedSource }>(
+          (r) => (finish = () => r({ sessionId: 's1', source })),
+        ),
+    )
+
+    render(<App />)
+
+    expect(screen.queryByPlaceholderText(/github.com/)).toBeNull()
+    expect(screen.getByRole('status', { name: 'Reopening' }).textContent).toContain(
+      'github.com/o/r/pull/1',
+    )
+    act(() => finish())
+    expect(await screen.findByRole('heading', { level: 1, name: 'Add retry' })).toBeTruthy()
+    expect(screen.queryByPlaceholderText(/github.com/)).toBeNull()
+  })
+
+  it('shows the start screen with the error when the last source does not open', async () => {
+    localStorage.setItem(
+      'spiffy.last',
+      JSON.stringify({
+        request: { kind: 'pr', url: 'https://github.com/o/r/pull/1' },
+        nav: { mode: 'summary', path: { level: 'source' }, file: null, direction: 1, cursor: null },
+      }),
+    )
+    window.spiffy.loadSource = vi.fn(async () => {
+      throw new Error('gh: not logged in')
+    })
+
+    render(<App />)
+
+    expect(await screen.findByPlaceholderText(/github.com/)).toBeTruthy()
+    expect(await screen.findByText(/not logged in/)).toBeTruthy()
+  })
+
   it('opens the last source at the change where you left it', async () => {
     const user = await openPr()
     await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))

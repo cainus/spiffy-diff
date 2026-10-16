@@ -10,7 +10,7 @@ import type { AppState } from './store'
 export interface Store extends AppState {
   owners: Map<string, HunkOwner[]>
   /** Open a source. `resumeNav` is a position to restore when the summary arrives. */
-  open: (req: LoadRequest, resumeNav?: NavState | null) => Promise<void>
+  open: (req: LoadRequest, resumeNav?: NavState | null, resuming?: boolean) => Promise<void>
   resummarize: (backend?: Backend) => Promise<void>
   setBackend: (backend: Backend) => void
   close: () => void

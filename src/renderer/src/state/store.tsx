@@ -33,6 +33,8 @@ export interface AppState {
   request: LoadRequest | null
   /** A saved position to restore when the summary arrives. */
   resumeNav: NavState | null
+  /** The app opens the last source at start. The start screen waits until that fails. */
+  resuming: boolean
   /** Changes that the agent writes again, by change ID. */
   reruns: Record<string, RerunState>
   backend: Backend
@@ -40,7 +42,7 @@ export interface AppState {
 }
 
 type Action =
-  | { type: 'loading'; request: LoadRequest; resumeNav: NavState | null }
+  | { type: 'loading'; request: LoadRequest; resumeNav: NavState | null; resuming: boolean }
   | { type: 'loaded'; sessionId: string; source: LoadedSource }
   | { type: 'summarizing'; runId: number }
   | { type: 'partial'; partial: DeepPartial<ModelSummary>; runId: number }
@@ -70,6 +72,7 @@ const initial: AppState = {
   request: null,
   resumeNav: null,
   reruns: {},
+  resuming: false,
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
 }
@@ -113,9 +116,10 @@ function reducer(state: AppState, action: Action): AppState {
         status: 'loading',
         request: action.request,
         resumeNav: action.resumeNav,
+        resuming: action.resuming,
       }
     case 'loaded':
-      return { ...state, sessionId: action.sessionId, source: action.source }
+      return { ...state, sessionId: action.sessionId, source: action.source, resuming: false }
     case 'summarizing':
       return {
         ...state,
@@ -156,7 +160,7 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
     case 'error':
-      return { ...state, status: 'error', error: action.error }
+      return { ...state, status: 'error', error: action.error, resuming: false }
     case 'backend':
       return { ...state, backend: action.backend }
     case 'close':
@@ -167,7 +171,13 @@ function reducer(state: AppState, action: Action): AppState {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initial)
+  // With a last source, the app starts in the loading state, so the start screen never shows first.
+  const [state, dispatch] = useReducer(reducer, initial, (start): AppState => {
+    const last = readLast()
+    return last
+      ? { ...start, status: 'loading', request: last.request, resumeNav: last.nav, resuming: true }
+      : start
+  })
   const latest = useRef(state)
   useLayoutEffect(() => {
     latest.current = state
@@ -193,8 +203,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const open = useCallback(
-    async (req: LoadRequest, resumeNav: NavState | null = null) => {
-      dispatch({ type: 'loading', request: req, resumeNav })
+    async (req: LoadRequest, resumeNav: NavState | null = null, resuming = false) => {
+      dispatch({ type: 'loading', request: req, resumeNav, resuming })
       try {
         const { sessionId, source } = await window.spiffy.loadSource(req)
         dispatch({ type: 'loaded', sessionId, source })
@@ -233,7 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (resumed.current) return
     resumed.current = true
     const last = readLast()
-    if (last) void open(last.request, last.nav)
+    if (last) void open(last.request, last.nav, true)
   }, [open])
 
   // A rerun lives in the store, so it ends well when you leave the change page.
