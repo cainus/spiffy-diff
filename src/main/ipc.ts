@@ -7,8 +7,8 @@ import type { TermEvent } from '@shared/terms'
 import type { Backend } from '@shared/source'
 import { createModel } from './core/backends'
 import { chatStream } from './core/chat'
-import { listBranches, loadBranchSource, repoName } from './core/git'
-import { findOpenPr, loadPrSource, runGh } from './core/github'
+import { branchHead, listBranches, loadBranchSource, repoName } from './core/git'
+import { findOpenPr, loadPrSource, prHead, runGh } from './core/github'
 import { Sessions } from './core/session'
 import { explainTerm, whenExplained } from './core/explain-term'
 import { simplify } from './core/simplify'
@@ -30,6 +30,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       }),
     ensureWorkspace,
     repoName,
+    headOf: (req) =>
+      req.kind === 'pr'
+        ? prHead(req.url, runGh)
+        : branchHead(req.repoPath, req.branch, req.includeUncommitted),
     summarize: async (source, cwd, backend, onPartial, onProgress) =>
       summarize(source, {
         model: await createModel(backend, cwd),
@@ -41,6 +45,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('source:load', (_e, req: LoadRequest) => sessions.load(req))
+  ipcMain.handle('source:check', (_e, sessionId: string) => sessions.hasNewVersion(sessionId))
 
   ipcMain.handle('summary:run', (e, reqId: string, sessionId: string, backend: Backend) =>
     sessions.summarize(

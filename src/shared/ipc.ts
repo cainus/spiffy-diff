@@ -63,6 +63,8 @@ export interface SpiffyBridge {
   listBranches(repoPath: string): Promise<BranchList>
   /** Explain a text again as for a child (ELI5). The chunks are text. */
   simplify(req: SimplifyRequest, handlers: StreamHandlers<string>): () => void
+  /** True when the open source has new commits or new uncommitted changes since it loaded. */
+  checkSource(sessionId: string): Promise<boolean>
   /** Explain a selected phrase. The agent reads the code first. Main saves the answer for the source. */
   explainTerm(req: TermRequest, handlers: StreamHandlers<TermEvent>): () => void
   /** The saved explanations of the source. The key is `phraseKey(phrase)`. */

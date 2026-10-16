@@ -6,6 +6,7 @@ import { FilesView } from '@/components/files/files-view'
 import { LocalCopyButton } from '@/components/local-copy-button'
 import { SummaryView } from '@/components/summary/summary-view'
 import { SummaryProgressBar } from '@/components/summary-progress'
+import { VersionBanner } from '@/components/version-banner'
 import { ExplainPopup } from '@/components/explain/explain-popup'
 import { SelectionExplain } from '@/components/explain/selection-explain'
 import { ExplainProvider } from '@/state/explain'
@@ -168,6 +169,7 @@ export function Workspace() {
             </Button>
           </div>
         </header>
+        <VersionBanner />
 
         <AnimatePresence>
           {(status === 'summarizing' || error) && (

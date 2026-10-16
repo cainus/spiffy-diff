@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { defaultBranch, listBranches, loadBranchSource, type PrLookup } from './git'
+import { branchHead, defaultBranch, listBranches, loadBranchSource, type PrLookup } from './git'
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -125,5 +125,26 @@ describe('loadBranchSource', () => {
 describe('listBranches', () => {
   it('lists local branches with the current branch first', async () => {
     expect(await listBranches(repo)).toEqual({ current: 'feature', branches: ['feature', 'trunk'] })
+  })
+})
+
+describe('branchHead', () => {
+  it('matches the head and the uncommitted hash of a loaded branch, and changes after a commit or an edit', async () => {
+    writeFileSync(join(repo, 'a.txt'), 'dirty\n')
+    const loaded = await loadBranchSource(repo, 'feature', {
+      includeUncommitted: true,
+      findPr: noPr,
+    })
+
+    expect(await branchHead(repo, 'feature', true)).toEqual({
+      headSha: loaded.headSha,
+      dirtyHash: loaded.dirtyHash,
+    })
+
+    writeFileSync(join(repo, 'a.txt'), 'dirtier\n')
+    expect((await branchHead(repo, 'feature', true)).dirtyHash).not.toBe(loaded.dirtyHash)
+
+    const next = commit(repo, 'c.txt', 'new\n')
+    expect(await branchHead(repo, 'feature', false)).toEqual({ headSha: next, dirtyHash: null })
   })
 })

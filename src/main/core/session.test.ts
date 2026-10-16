@@ -39,6 +39,7 @@ function deps(overrides: Partial<SessionDeps> = {}): SessionDeps & { calls: stri
       )
       return '/ws'
     },
+    headOf: async () => ({ headSha: source.headSha, dirtyHash: source.dirtyHash }),
     repoName: async (path) => (path === '/code/r' ? 'o/r' : 'other/repo'),
     summarize: async (_source, cwd) => {
       calls.push(`summarize ${cwd}`)
@@ -172,6 +173,51 @@ describe('Sessions', () => {
     const next = await other.load({ kind: 'pr', url: 'https://github.com/o/other/pull/1' })
 
     expect(await other.explanations(next.sessionId)).toEqual({})
+  })
+
+  it('tells when the source has a new head commit or new uncommitted changes', async () => {
+    let head = { headSha: source.headSha, dirtyHash: source.dirtyHash }
+    const d = deps({ headOf: async () => head })
+    const sessions = new Sessions(d)
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+
+    expect(await sessions.hasNewVersion(sessionId)).toBe(false)
+    head = { headSha: 'h2', dirtyHash: source.dirtyHash }
+    expect(await sessions.hasNewVersion(sessionId)).toBe(true)
+    head = { headSha: source.headSha, dirtyHash: 'd2' }
+    expect(await sessions.hasNewVersion(sessionId)).toBe(true)
+  })
+
+  it('asks for the head of the same request that loaded the source', async () => {
+    const asked: unknown[] = []
+    const sessions = new Sessions(
+      deps({
+        headOf: async (req) => {
+          asked.push(req)
+          return { headSha: source.headSha, dirtyHash: null }
+        },
+      }),
+    )
+    const request = {
+      kind: 'branch',
+      repoPath: '/code/r',
+      branch: 'feature',
+      includeUncommitted: true,
+    } as const
+    const { sessionId } = await sessions.load(request)
+
+    await sessions.hasNewVersion(sessionId)
+
+    expect(asked).toEqual([request])
+  })
+
+  it('does not report a new version when the check fails, for example offline', async () => {
+    const sessions = new Sessions(
+      deps({ headOf: async () => Promise.reject(new Error('offline')) }),
+    )
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+
+    expect(await sessions.hasNewVersion(sessionId)).toBe(false)
   })
 
   it('rejects an unknown session ID', async () => {

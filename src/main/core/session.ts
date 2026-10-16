@@ -4,7 +4,13 @@ import { join } from 'node:path'
 import type { DeepPartial } from 'ai'
 import type { LoadRequest, LoadResult } from '@shared/ipc'
 import type { SummaryProgress } from '@shared/progress'
-import { parsePrUrl, summaryCacheKey, type Backend, type LoadedSource } from '@shared/source'
+import {
+  parsePrUrl,
+  summaryCacheKey,
+  type Backend,
+  type LoadedSource,
+  type SourceHead,
+} from '@shared/source'
 import type { ModelSummary, Summary } from '@shared/summary'
 import { phraseKey, type Explanation } from '@shared/terms'
 import { readCachedSummary, writeCachedSummary } from './cache'
@@ -20,6 +26,8 @@ export interface SessionDeps {
     includeUncommitted: boolean,
   ) => Promise<LoadedSource>
   ensureWorkspace: (req: WorkspaceRequest) => Promise<string>
+  /** The head of a source, without its diff. */
+  headOf: (request: LoadRequest) => Promise<SourceHead>
   /** The GitHub `owner/name` of a local folder. */
   repoName: (path: string) => Promise<string>
   summarize: (
@@ -53,6 +61,18 @@ export class Sessions {
     const sessionId = randomUUID()
     this.sessions.set(sessionId, { request, source })
     return { sessionId, source }
+  }
+
+  /** True when the source has a new head commit or new uncommitted changes since it loaded. */
+  async hasNewVersion(sessionId: string): Promise<boolean> {
+    const { request, source } = this.get(sessionId)
+    try {
+      const head = await this.deps.headOf(request)
+      return head.headSha !== source.headSha || head.dirtyHash !== source.dirtyHash
+    } catch {
+      // A failed check (offline, gh logged out) must not show a false banner.
+      return false
+    }
   }
 
   get(sessionId: string): Session {

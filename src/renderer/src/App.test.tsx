@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
 import { parseDiff } from '@shared/diff'
 import type { SpiffyBridge } from '@shared/ipc'
 import type { LoadedSource } from '@shared/source'
 import type { Summary } from '@shared/summary'
 import { App } from './App'
+import { CHECK_EVERY_MS } from './lib/use-version-watch'
 
 // The diff renderer draws into Shadow DOM. The tests check which patch it gets.
 vi.mock('@pierre/diffs/react', () => ({
@@ -71,6 +72,7 @@ function fakeBridge(): SpiffyBridge {
     loadSource: vi.fn(async () => ({ sessionId: 's1', source })),
     summarize: vi.fn(async () => summary),
     chat: vi.fn(() => () => {}),
+    checkSource: vi.fn(async () => false),
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
     linkRepo: vi.fn(async () => {}),
@@ -311,6 +313,83 @@ describe('arrow keys', () => {
     expect(
       screen.getByRole('button', { name: /Retry failed calls/ }).getAttribute('aria-current'),
     ).toBeNull()
+  })
+})
+
+describe('new versions of the source', () => {
+  const atChange = {
+    request: { kind: 'pr', url: 'https://github.com/o/r/pull/1' },
+    nav: {
+      mode: 'summary',
+      path: { level: 'change', goalId: 'g1', changeId: 'g1.c1' },
+      file: null,
+      direction: 1,
+      cursor: null,
+    },
+  }
+
+  async function openAtChange() {
+    localStorage.setItem('spiffy.last', JSON.stringify(atChange))
+    render(<App />)
+    await screen.findByRole('heading', { level: 1, name: 'Wrap the call' })
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('checks every minute while the window has the focus, and offers a reload that keeps the place', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    const bridge = window.spiffy
+    await openAtChange()
+    bridge.checkSource = vi.fn(async () => true)
+
+    await act(() => vi.advanceTimersByTimeAsync(CHECK_EVERY_MS))
+
+    expect(bridge.checkSource).toHaveBeenCalledWith('s1')
+    const banner = await screen.findByRole('status', { name: 'New version' })
+    expect(banner.textContent).toContain('This PR has new commits.')
+    await userEvent
+      .setup({ advanceTimers: vi.advanceTimersByTime })
+      .click(within(banner).getByRole('button', { name: 'Reload' }))
+
+    await vi.waitFor(() => expect(bridge.loadSource).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Wrap the call' })).toBeTruthy()
+    expect(screen.queryByRole('status', { name: 'New version' })).toBeNull()
+  })
+
+  it('does not check while the window does not have the focus', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    await openAtChange()
+
+    await act(() => vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 3))
+
+    expect(window.spiffy.checkSource).not.toHaveBeenCalled()
+  })
+
+  it('checks when the window gets the focus again', async () => {
+    await openAtChange()
+    window.spiffy.checkSource = vi.fn(async () => true)
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(await screen.findByRole('status', { name: 'New version' })).toBeTruthy()
+  })
+
+  it('shows no banner when the source did not change', async () => {
+    await openAtChange()
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    await vi.waitFor(() => expect(window.spiffy.checkSource).toHaveBeenCalled())
+    expect(screen.queryByRole('status', { name: 'New version' })).toBeNull()
   })
 })
 

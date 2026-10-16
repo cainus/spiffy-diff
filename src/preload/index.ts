@@ -60,6 +60,7 @@ const api: SpiffyBridge = {
   simplify: (req, handlers) => stream<string>('simplify', req, handlers),
   explainTerm: (req, handlers) => stream<TermEvent>('term', req, handlers),
   explanations: (sessionId) => ipcRenderer.invoke('explanations', sessionId),
+  checkSource: (sessionId) => ipcRenderer.invoke('source:check', sessionId),
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
   listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),

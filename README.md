@@ -51,6 +51,7 @@ The app is not signed.
 - Select any text in an explanation, a hunk note, or a popup, then press Explain. A popup shows the answer and what the agent reads while it works. Select text in a popup (or click an underlined phrase in it) to open another popup on top, to any depth. Escape closes the top popup; a click in a lower popup closes the popups above it. ↻ explains again.
 - Explained phrases are saved per repository in `~/.spiffy/explanations/` (the data folder keeps its old name, because git worktrees in it use absolute paths). They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
 - Keys: ↑/↓ move the highlight (or go to the last/next change or file), → or Enter drills in, ← or Escape drills out.
+- spiffy-diff checks for new commits (or new uncommitted changes on a branch) every minute while the window has the focus, and when you come back to the window. A banner offers Reload, which keeps your place.
 - At start, spiffy-diff opens the last source at the place where you left it. Press Change PR in the top bar to open a different PR or branch.
   - dotted blue: technical jargon
   - green, monospace: internal code concepts

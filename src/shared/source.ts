@@ -34,6 +34,12 @@ export function summaryCacheKey(p: CacheKeyParts): string {
   return [SUMMARY_VERSION, repo, p.baseSha, p.headSha, p.dirtyHash ?? 'clean', p.backend].join('-')
 }
 
+/** The version of a source: its head commit and the hash of its uncommitted changes. */
+export interface SourceHead {
+  headSha: string
+  dirtyHash: string | null
+}
+
 /** A source after spiffy reads it. See CONTEXT.md. */
 export interface LoadedSource {
   kind: 'pr' | 'branch'

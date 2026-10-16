@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findOpenPr, loadPrSource, type GhRunner } from './github'
+import { findOpenPr, loadPrSource, type GhRunner, prHead } from './github'
 
 const diff = `diff --git a/a.ts b/a.ts
 --- a/a.ts
@@ -56,6 +56,22 @@ describe('loadPrSource', () => {
       /not a GitHub pull request URL/,
     )
     expect(gh.calls).toEqual([])
+  })
+})
+
+describe('prHead', () => {
+  it('reads only the head commit of the PR', async () => {
+    const calls: string[][] = []
+    const gh: GhRunner = async (args) => {
+      calls.push(args)
+      return JSON.stringify({ headRefOid: 'h9' })
+    }
+
+    expect(await prHead('github.com/o/r/pull/3/files', gh)).toEqual({
+      headSha: 'h9',
+      dirtyHash: null,
+    })
+    expect(calls).toEqual([['pr', 'view', 'https://github.com/o/r/pull/3', '--json', 'headRefOid']])
   })
 })
 

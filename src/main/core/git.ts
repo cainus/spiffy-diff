@@ -4,7 +4,7 @@ import { basename } from 'node:path'
 import { promisify } from 'node:util'
 import { parseDiff } from '@shared/diff'
 import type { BranchList } from '@shared/ipc'
-import type { LoadedSource } from '@shared/source'
+import type { LoadedSource, SourceHead } from '@shared/source'
 
 const exec = promisify(execFile)
 
@@ -54,6 +54,26 @@ export interface BranchOptions {
   findPr: PrLookup
 }
 
+/** Uncommitted changes count only when the branch is checked out. */
+async function usesUncommitted(cwd: string, branch: string, include: boolean): Promise<boolean> {
+  return include && (await gitLine(cwd, 'rev-parse', '--abbrev-ref', 'HEAD')) === branch
+}
+
+function dirtyHash(dirty: string): string | null {
+  return dirty ? createHash('sha1').update(dirty).digest('hex').slice(0, 12) : null
+}
+
+/** The head commit and the uncommitted hash of a branch, without the diff. */
+export async function branchHead(
+  cwd: string,
+  branch: string,
+  includeUncommitted: boolean,
+): Promise<SourceHead> {
+  const headSha = await gitLine(cwd, 'rev-parse', `${branch}^{commit}`)
+  const withDirty = await usesUncommitted(cwd, branch, includeUncommitted)
+  return { headSha, dirtyHash: dirtyHash(withDirty ? await git(cwd, 'diff', 'HEAD') : '') }
+}
+
 export async function loadBranchSource(
   cwd: string,
   branch: string,
@@ -64,8 +84,7 @@ export async function loadBranchSource(
   const headSha = await gitLine(cwd, 'rev-parse', `${branch}^{commit}`)
   const baseSha = await gitLine(cwd, 'merge-base', headSha, `origin/${baseBranch}`)
 
-  const current = await gitLine(cwd, 'rev-parse', '--abbrev-ref', 'HEAD')
-  const withDirty = options.includeUncommitted && current === branch
+  const withDirty = await usesUncommitted(cwd, branch, options.includeUncommitted)
   const dirty = withDirty ? await git(cwd, 'diff', 'HEAD') : ''
   const diff = await git(cwd, 'diff', '--find-renames', baseSha, ...(withDirty ? [] : [headSha]))
 
@@ -77,7 +96,7 @@ export async function loadBranchSource(
     prUrl: pr?.url ?? null,
     baseSha,
     headSha,
-    dirtyHash: dirty ? createHash('sha1').update(dirty).digest('hex').slice(0, 12) : null,
+    dirtyHash: dirtyHash(dirty),
     files: parseDiff(diff),
   }
 }
