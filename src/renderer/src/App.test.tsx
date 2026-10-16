@@ -3,7 +3,8 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
 import { parseDiff } from '@shared/diff'
-import type { SpiffyBridge } from '@shared/ipc'
+import type { SpiffyBridge, StreamHandlers } from '@shared/ipc'
+import type { RerunEvent } from '@shared/rerun'
 import type { LoadedSource } from '@shared/source'
 import type { Summary } from '@shared/summary'
 import { App } from './App'
@@ -77,6 +78,7 @@ function fakeBridge(): SpiffyBridge {
     summarize: vi.fn(async () => summary),
     chat: vi.fn(() => () => {}),
     checkSource: vi.fn(async () => false),
+    rerunChange: vi.fn(() => () => {}),
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
     linkRepo: vi.fn(async () => {}),
@@ -456,6 +458,74 @@ describe('the files view', () => {
     )
 
     expect(await screen.findByRole('heading', { name: 'Wrap the call' })).toBeTruthy()
+  })
+})
+
+describe('rerunning a change', () => {
+  async function openChange() {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+    await screen.findByRole('heading', { level: 1, name: 'Wrap the call' })
+    return user
+  }
+
+  function rerunWith() {
+    let h: StreamHandlers<RerunEvent> | null = null
+    window.spiffy.rerunChange = vi.fn((_req, handlers) => {
+      h = handlers
+      return () => {}
+    })
+    return {
+      send: (e: RerunEvent) => act(() => h!.onChunk(e)),
+      end: () => act(() => h!.onEnd()),
+      fail: (m: string) => act(() => h!.onError(m)),
+    }
+  }
+
+  it('writes the change again, shows what the agent reads, and shows the new text', async () => {
+    const run = rerunWith()
+    const user = await openChange()
+
+    await user.click(screen.getByRole('button', { name: 'Rerun this change' }))
+
+    expect(window.spiffy.rerunChange).toHaveBeenCalledWith(
+      { sessionId: 's1', backend: 'claude', goalId: 'g1', changeId: 'g1.c1' },
+      expect.anything(),
+    )
+    expect(screen.getByRole('button', { name: 'Rerun this change' }).hasAttribute('disabled')).toBe(
+      true,
+    )
+    await run.send({ type: 'activity', text: 'Reading src/retry.ts' })
+    expect(screen.getByRole('status', { name: 'Rerun' }).textContent).toContain(
+      'Reading src/retry.ts',
+    )
+
+    await run.send({
+      type: 'done',
+      title: 'Add a backoff',
+      description: 'The retry waits.',
+      hunkNotes: { h1: 'Waits between tries.' },
+    })
+    await run.end()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Add a backoff' })).toBeTruthy()
+    expect(await screen.findByText('Waits between tries.')).toBeTruthy()
+    expect(screen.queryByRole('status', { name: 'Rerun' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Rerun this change' }).hasAttribute('disabled')).toBe(
+      false,
+    )
+  })
+
+  it('shows the error and keeps the old change when the rerun fails', async () => {
+    const run = rerunWith()
+    const user = await openChange()
+    await user.click(screen.getByRole('button', { name: 'Rerun this change' }))
+
+    await run.fail('rate limit')
+
+    expect(await screen.findByText(/rate limit/)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Wrap the call' })).toBeTruthy()
   })
 })
 

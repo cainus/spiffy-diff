@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { UIMessageChunk } from 'ai'
 import type { SpiffyBridge, StreamHandlers } from '@shared/ipc'
+import type { RerunEvent } from '@shared/rerun'
 import type { TermEvent } from '@shared/terms'
 import type { SummaryProgress } from '@shared/progress'
 
@@ -61,6 +62,7 @@ const api: SpiffyBridge = {
   explainTerm: (req, handlers) => stream<TermEvent>('term', req, handlers),
   explanations: (sessionId) => ipcRenderer.invoke('explanations', sessionId),
   checkSource: (sessionId) => ipcRenderer.invoke('source:check', sessionId),
+  rerunChange: (req, handlers) => stream<RerunEvent>('rerun', req, handlers),
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
   listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),

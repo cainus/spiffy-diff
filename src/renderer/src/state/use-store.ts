@@ -14,6 +14,8 @@ export interface Store extends AppState {
   setBackend: (backend: Backend) => void
   close: () => void
   nav$: (action: NavAction) => void
+  /** Write one change again with the agent. `reruns` shows the progress. */
+  rerunChange: (goalId: string, changeId: string) => void
 }
 
 export const StoreContext = createContext<Store | null>(null)

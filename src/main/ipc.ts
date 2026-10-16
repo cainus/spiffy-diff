@@ -2,7 +2,14 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { dialog, ipcMain, type BrowserWindow } from 'electron'
 import type { UIMessageChunk } from 'ai'
-import type { ChatTurnRequest, LoadRequest, SimplifyRequest, TermRequest } from '@shared/ipc'
+import type {
+  ChatTurnRequest,
+  LoadRequest,
+  RerunRequest,
+  SimplifyRequest,
+  TermRequest,
+} from '@shared/ipc'
+import type { RerunEvent } from '@shared/rerun'
 import type { TermEvent } from '@shared/terms'
 import type { Backend } from '@shared/source'
 import { createModel } from './core/backends'
@@ -11,6 +18,7 @@ import { branchHead, listBranches, loadBranchSource, repoName } from './core/git
 import { findOpenPr, loadPrSource, prHead, runGh } from './core/github'
 import { Sessions } from './core/session'
 import { explainTerm, whenExplained } from './core/explain-term'
+import { rerunChange } from './core/rerun-change'
 import { simplify } from './core/simplify'
 import { summarize } from './core/summarize'
 import { ensureWorkspace } from './core/workspace'
@@ -117,6 +125,28 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return whenExplained(events, (text) =>
       sessions.rememberExplanation(req.sessionId, req.phrase, text),
     )
+  })
+  serveStream<RerunRequest, RerunEvent>('rerun', async (req, signal) => {
+    const session = sessions.get(req.sessionId)
+    if (!session.summary) throw new Error('The summary is not ready yet.')
+    const cwd = await sessions.workspace(req.sessionId)
+    const events = rerunChange({
+      model: await createModel(req.backend, cwd),
+      cwd,
+      source: session.source,
+      summary: session.summary,
+      goalId: req.goalId,
+      changeId: req.changeId,
+      abortSignal: signal,
+    })
+    return (async function* () {
+      for await (const e of events) {
+        // Save first, so a new window or a restart shows the new change.
+        if (e.type === 'done')
+          await sessions.saveRerun(req.sessionId, req.backend, req.goalId, req.changeId, e)
+        yield e
+      }
+    })()
   })
   ipcMain.handle('explanations', (_e, sessionId: string) => sessions.explanations(sessionId))
 

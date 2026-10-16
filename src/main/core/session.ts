@@ -12,6 +12,7 @@ import {
   type SourceHead,
 } from '@shared/source'
 import type { ModelSummary, Summary } from '@shared/summary'
+import { applyRerun, type RerunEvent } from '@shared/rerun'
 import { phraseKey, type Explanation } from '@shared/terms'
 import { readCachedSummary, writeCachedSummary } from './cache'
 import type { WorkspaceRequest } from './workspace'
@@ -142,6 +143,26 @@ export class Sessions {
     const cwd = await this.workspace(sessionId)
     const summary = await this.deps.summarize(source, cwd, backend, onPartial, onProgress)
     await writeCachedSummary(this.deps.home, key, summary)
+    session.summary = summary
+    return summary
+  }
+
+  /** Put a change that the agent wrote again in the summary, and save the summary. */
+  async saveRerun(
+    sessionId: string,
+    backend: Backend,
+    goalId: string,
+    changeId: string,
+    done: Extract<RerunEvent, { type: 'done' }>,
+  ): Promise<Summary> {
+    const session = this.get(sessionId)
+    if (!session.summary) throw new Error('The summary is not ready yet.')
+    const summary = applyRerun(session.summary, goalId, changeId, done)
+    await writeCachedSummary(
+      this.deps.home,
+      summaryCacheKey({ ...session.source, backend }),
+      summary,
+    )
     session.summary = summary
     return summary
   }

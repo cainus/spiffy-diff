@@ -12,6 +12,7 @@ import type { LoadRequest } from '@shared/ipc'
 import type { SummaryProgress } from '@shared/progress'
 import type { Backend, LoadedSource } from '@shared/source'
 import { hunkOwners, type ModelSummary, type Summary } from '@shared/summary'
+import { applyRerun, type RerunEvent } from '@shared/rerun'
 import { initialNav, navReducer, restoreNav, type NavAction, type NavState } from '@/lib/nav'
 import { errorText } from '@/lib/errors'
 import { StoreContext, type Store } from './use-store'
@@ -32,6 +33,8 @@ export interface AppState {
   request: LoadRequest | null
   /** A saved position to restore when the summary arrives. */
   resumeNav: NavState | null
+  /** Changes that the agent writes again, by change ID. */
+  reruns: Record<string, RerunState>
   backend: Backend
   nav: NavState
 }
@@ -43,6 +46,13 @@ type Action =
   | { type: 'partial'; partial: DeepPartial<ModelSummary>; runId: number }
   | { type: 'progress'; progress: SummaryProgress; runId: number }
   | { type: 'summary'; summary: Summary; runId: number }
+  | { type: 'rerun'; changeId: string; state: RerunState | null }
+  | {
+      type: 'rerunDone'
+      goalId: string
+      changeId: string
+      done: Extract<RerunEvent, { type: 'done' }>
+    }
   | { type: 'error'; error: string; runId?: number }
   | { type: 'backend'; backend: Backend }
   | { type: 'close' }
@@ -59,8 +69,16 @@ const initial: AppState = {
   runId: 0,
   request: null,
   resumeNav: null,
+  reruns: {},
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
+}
+
+export interface RerunState {
+  running: boolean
+  /** The last step of the agent. */
+  activity: string | null
+  error: string | null
 }
 
 const LAST_KEY = 'spiffy.last'
@@ -112,6 +130,18 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, progress: action.progress }
     case 'partial':
       return { ...state, partial: action.partial }
+    case 'rerun': {
+      const reruns = { ...state.reruns }
+      if (action.state) reruns[action.changeId] = action.state
+      else delete reruns[action.changeId]
+      return { ...state, reruns }
+    }
+    case 'rerunDone':
+      if (!state.summary) return state
+      return {
+        ...state,
+        summary: applyRerun(state.summary, action.goalId, action.changeId, action.done),
+      }
     case 'summary': {
       const files = state.source?.files.map((f) => f.path) ?? []
       const nav = state.resumeNav ? restoreNav(state.resumeNav, action.summary, files) : state.nav
@@ -205,6 +235,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (last) void open(last.request, last.nav)
   }, [open])
 
+  // A rerun lives in the store, so it ends well when you leave the change page.
+  const rerunChange = useCallback((goalId: string, changeId: string) => {
+    const { sessionId, backend } = latest.current
+    if (!sessionId) return
+    const set = (state: RerunState | null): void => {
+      if (latest.current.sessionId === sessionId) dispatch({ type: 'rerun', changeId, state })
+    }
+    set({ running: true, activity: null, error: null })
+    window.spiffy.rerunChange(
+      { sessionId, backend, goalId, changeId },
+      {
+        onChunk: (e) => {
+          if (latest.current.sessionId !== sessionId) return
+          if (e.type === 'activity') set({ running: true, activity: e.text, error: null })
+          else dispatch({ type: 'rerunDone', goalId, changeId, done: e })
+        },
+        onEnd: () => set(null),
+        onError: (m) => set({ running: false, activity: null, error: errorText(m) }),
+      },
+    )
+  }, [])
+
   const owners = useMemo(
     () => (state.summary ? hunkOwners(state.summary) : new Map()),
     [state.summary],
@@ -222,8 +274,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'close' })
       },
       nav$: (action) => dispatch({ type: 'nav', action }),
+      rerunChange,
     }),
-    [state, owners, open, resummarize, setBackend],
+    [state, owners, open, resummarize, setBackend, rerunChange],
   )
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>

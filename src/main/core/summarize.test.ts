@@ -1,4 +1,3 @@
-import { simulateReadableStream } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it } from 'vitest'
 import { parseDiff } from '@shared/diff'
@@ -6,74 +5,7 @@ import type { ModelSummary } from '@shared/summary'
 import type { LoadedSource } from '@shared/source'
 import type { SummaryProgress } from '@shared/progress'
 import { choosePlan, promptHunks, summarize } from './summarize'
-
-const usage = {
-  inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
-  outputTokens: { total: 1, text: 1, reasoning: undefined },
-}
-
-function streamJson(json: string) {
-  const parts = json.match(/.{1,7}/gs) ?? []
-  return {
-    stream: simulateReadableStream({
-      chunks: [
-        { type: 'text-start' as const, id: 't' },
-        ...parts.map((delta) => ({ type: 'text-delta' as const, id: 't', delta })),
-        { type: 'text-end' as const, id: 't' },
-        {
-          type: 'finish' as const,
-          finishReason: { unified: 'stop' as const, raw: undefined },
-          logprobs: undefined,
-          usage,
-        },
-      ],
-    }),
-  }
-}
-
-function investigationStream(paths: string[], text: string) {
-  return {
-    stream: simulateReadableStream({
-      chunks: [
-        ...paths.flatMap((path, i) => [
-          {
-            type: 'tool-call' as const,
-            toolCallId: `t${i}`,
-            toolName: 'Read',
-            input: JSON.stringify({ file_path: path }),
-            providerExecuted: true,
-            dynamic: true,
-          },
-          {
-            type: 'tool-result' as const,
-            toolCallId: `t${i}`,
-            toolName: 'Read',
-            result: 'file text',
-            dynamic: true,
-          },
-        ]),
-        { type: 'text-start' as const, id: 'n' },
-        { type: 'text-delta' as const, id: 'n', delta: text },
-        { type: 'text-end' as const, id: 'n' },
-        {
-          type: 'finish' as const,
-          finishReason: { unified: 'stop' as const, raw: undefined },
-          logprobs: undefined,
-          usage,
-        },
-      ],
-    }),
-  }
-}
-
-function generateJson(value: unknown) {
-  return {
-    content: [{ type: 'text' as const, text: JSON.stringify(value) }],
-    finishReason: { unified: 'stop' as const, raw: undefined },
-    usage,
-    warnings: [],
-  }
-}
+import { generateJson, investigationStream, streamJson } from './test-streams'
 
 const diff = `diff --git a/src/retry.ts b/src/retry.ts
 --- a/src/retry.ts

@@ -220,6 +220,56 @@ describe('Sessions', () => {
     expect(await sessions.hasNewVersion(sessionId)).toBe(false)
   })
 
+  it('saves a change that the agent wrote again, in the session and in the cache', async () => {
+    const withChange: Summary = {
+      overview: 'o',
+      goals: [
+        {
+          id: 'g1',
+          kind: 'model',
+          title: 'G',
+          description: '',
+          changes: [{ id: 'g1.c1', title: 'Old', description: 'old', hunkIds: ['h1'] }],
+        },
+      ],
+      hunkNotes: { h1: 'old note' },
+    }
+    const d = deps({ summarize: async () => withChange })
+    const sessions = new Sessions(d)
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+    await sessions.summarize(sessionId, 'claude', () => {})
+
+    const saved = await sessions.saveRerun(sessionId, 'claude', 'g1', 'g1.c1', {
+      type: 'done',
+      title: 'New',
+      description: 'new',
+      hunkNotes: { h1: 'new note' },
+    })
+
+    expect(saved.goals[0]!.changes[0]!.title).toBe('New')
+    expect(sessions.get(sessionId).summary).toEqual(saved)
+    const later = new Sessions({
+      ...d,
+      summarize: async () => Promise.reject(new Error('not cached')),
+    })
+    const again = await later.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+    expect(await later.summarize(again.sessionId, 'claude', () => {})).toEqual(saved)
+  })
+
+  it('refuses to save a rerun before the summary exists', async () => {
+    const sessions = new Sessions(deps())
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+
+    await expect(
+      sessions.saveRerun(sessionId, 'claude', 'g1', 'g1.c1', {
+        type: 'done',
+        title: 't',
+        description: 'd',
+        hunkNotes: {},
+      }),
+    ).rejects.toThrow('summary')
+  })
+
   it('rejects an unknown session ID', async () => {
     await expect(new Sessions(deps()).workspace('nope')).rejects.toThrow(/unknown session/i)
   })

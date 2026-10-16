@@ -1,6 +1,9 @@
 import { CodeText } from '@/components/code-text'
-import { motion } from 'motion/react'
-import { ExternalLink } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { ExternalLink, RotateCw } from 'lucide-react'
+import { Shimmer } from '@/components/ai-elements/shimmer'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import type { Hunk } from '@shared/diff'
 import type { Change, Goal } from '@shared/summary'
 import { DiffStyleToggle } from '@/components/diff/diff-style-toggle'
@@ -21,7 +24,8 @@ export function ChangeLevel({
   change: Change
   index: Map<string, Hunk>
 }) {
-  const { source, nav$ } = useStore()
+  const { source, nav$, reruns, rerunChange } = useStore()
+  const rerun = reruns[change.id]
   const groups = groupByFile(change.hunkIds, source?.files ?? [])
 
   return (
@@ -45,8 +49,48 @@ export function ChangeLevel({
           <LineStats stats={lineStats(change.hunkIds, index)} />
         </motion.header>
 
-        <div className="flex items-center justify-end gap-2">
-          <DiffStyleToggle />
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label="Rerun this change"
+            title="The agent reads the code again and writes this change and its hunk notes again"
+            disabled={rerun?.running}
+            onClick={() => rerunChange(goal.id, change.id)}
+            className="gap-1.5"
+          >
+            <RotateCw className={cn('size-3.5', rerun?.running && 'animate-spin')} />
+            Rerun
+          </Button>
+          <AnimatePresence mode="wait" initial={false}>
+            {rerun?.running && (
+              <motion.span
+                key={rerun.activity ?? 'start'}
+                role="status"
+                aria-label="Rerun"
+                initial={{ opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.15 }}
+                className="min-w-0 truncate text-xs"
+              >
+                <Shimmer>{rerun.activity ?? 'The agent reads the code…'}</Shimmer>
+              </motion.span>
+            )}
+            {rerun?.error && (
+              <motion.span
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-destructive min-w-0 truncate text-xs"
+              >
+                {rerun.error}
+              </motion.span>
+            )}
+          </AnimatePresence>
+          <div className="ml-auto">
+            <DiffStyleToggle />
+          </div>
         </div>
 
         {groups.map((g, i) => (

@@ -1,6 +1,7 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 import type { Focus } from './focus'
 import type { SummaryProgress } from './progress'
+import type { RerunEvent } from './rerun'
 import type { Explanation, TermEvent } from './terms'
 import type { Backend, LoadedSource } from './source'
 import type { ModelSummary, Summary } from './summary'
@@ -38,6 +39,13 @@ export interface TermRequest {
   context: string
 }
 
+export interface RerunRequest {
+  sessionId: string
+  backend: Backend
+  goalId: string
+  changeId: string
+}
+
 export interface StreamHandlers<T> {
   onChunk: (chunk: T) => void
   onEnd: () => void
@@ -63,6 +71,8 @@ export interface SpiffyBridge {
   listBranches(repoPath: string): Promise<BranchList>
   /** Explain a text again as for a child (ELI5). The chunks are text. */
   simplify(req: SimplifyRequest, handlers: StreamHandlers<string>): () => void
+  /** Write one change again. Main saves the new change in the summary cache before `done`. */
+  rerunChange(req: RerunRequest, handlers: StreamHandlers<RerunEvent>): () => void
   /** True when the open source has new commits or new uncommitted changes since it loaded. */
   checkSource(sessionId: string): Promise<boolean>
   /** Explain a selected phrase. The agent reads the code first. Main saves the answer for the source. */
