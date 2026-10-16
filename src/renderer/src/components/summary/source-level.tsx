@@ -22,8 +22,10 @@ export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
   return (
     <ScrollArea className="h-full">
       <div className="mx-auto max-w-5xl space-y-8 px-8 py-8">
-        <motion.header variants={itemVariants} className="space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight">{source?.title}</h1>
+        <header className="space-y-3">
+          <h1 title={source?.title} className="truncate text-3xl font-semibold tracking-tight">
+            {source?.title}
+          </h1>
           <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
             <span>{source?.repo}</span>
             <LineStats stats={all} />
@@ -44,7 +46,7 @@ export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
               <Shimmer className="text-lg">The agent reads the changes…</Shimmer>
             )
           )}
-        </motion.header>
+        </header>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {summary

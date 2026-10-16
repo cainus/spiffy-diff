@@ -469,6 +469,21 @@ describe('the files view', () => {
   })
 })
 
+describe('the source title', () => {
+  it('stays on one line with the full title on hover, and does not animate', async () => {
+    await openPr()
+
+    const title = screen.getByRole('heading', { level: 1, name: 'Add retry' })
+    expect(title.className).toContain('truncate')
+    expect(title.getAttribute('title')).toBe('Add retry')
+    // The page still slides as a whole when you drill. The title has no animation of its own.
+    for (const el of [title, title.parentElement!]) {
+      expect(el.style.opacity).toBe('')
+      expect(el.style.transform).toBe('')
+    }
+  })
+})
+
 describe('the agent panel toggle', () => {
   const panel = () => screen.getByText('agent').closest('[data-agent-panel]')!
 
