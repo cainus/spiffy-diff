@@ -262,7 +262,7 @@ describe('opening a new source', () => {
     await user.click(screen.getByRole('button', { name: 'Explain' }))
     await screen.findByRole('heading', { name: 'Add retry' })
 
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Change PR' }))
     await user.type(
       await screen.findByPlaceholderText(/github.com/),
       'https://github.com/o/r/pull/2',
@@ -313,7 +313,7 @@ describe('resuming', () => {
 
   it('shows the start screen after you close the source', async () => {
     const user = await openPr()
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Change PR' }))
     await screen.findByPlaceholderText(/github.com/)
     cleanup()
 

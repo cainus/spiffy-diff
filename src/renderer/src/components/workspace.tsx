@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, RotateCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, RotateCw } from 'lucide-react'
 import { BackendPicker } from '@/components/backend-picker'
 import { FilesView } from '@/components/files/files-view'
 import { LocalCopyButton } from '@/components/local-copy-button'
@@ -139,8 +139,15 @@ export function Workspace() {
             >
               <RotateCw className={cn('size-4', status === 'summarizing' && 'animate-spin')} />
             </Button>
-            <Button size="icon-sm" variant="ghost" title="Close" onClick={store.close}>
-              <X className="size-4" />
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Open a different PR or branch"
+              onClick={store.close}
+              className="gap-1.5"
+            >
+              <ArrowLeftRight className="size-3.5" />
+              Change PR
             </Button>
           </div>
         </header>

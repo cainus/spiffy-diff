@@ -50,7 +50,7 @@ The app is not signed.
 - **ELI5** beside an explanation asks the agent to explain it again as for a child. Click it again to hide it.
 - Select any text in an explanation, a hunk note, or a popup, then press Explain. A popup shows the answer and what the agent reads while it works. Select text in a popup (or click an underlined phrase in it) to open another popup on top, to any depth. Escape closes the top popup; a click in a lower popup closes the popups above it. ↻ explains again.
 - Explained phrases are saved per repository in `~/.spiffy/explanations/`. They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
-- At start, Spiffy opens the last source at the place where you left it. Close the source (✕) to start empty next time.
+- At start, Spiffy opens the last source at the place where you left it. Press Change PR in the top bar to open a different PR or branch.
   - dotted blue: technical jargon
   - green, monospace: internal code concepts
   - wavy amber: internal business concepts
