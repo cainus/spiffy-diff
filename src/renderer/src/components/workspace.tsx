@@ -87,12 +87,10 @@ export function Workspace() {
         {/* Only empty header space drags the window. Drag regions can take clicks from controls inside them. */}
         <header className="flex h-12 shrink-0 items-center gap-3 border-b pr-3">
           <div className="app-drag w-20 self-stretch" />
-          <motion.span
-            layoutId="brand"
-            className="shrink-0 text-sm font-semibold tracking-tight whitespace-nowrap"
-          >
+          {/* The name stays still. It does not fly in from the start screen. */}
+          <span className="shrink-0 text-sm font-semibold tracking-tight whitespace-nowrap">
             spiffy-diff
-          </motion.span>
+          </span>
           <AnimatePresence initial={false}>
             {canGoBack && (
               <motion.div

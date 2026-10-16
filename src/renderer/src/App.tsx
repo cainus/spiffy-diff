@@ -13,9 +13,11 @@ function Screens() {
       <AnimatePresence mode="wait">
         <motion.div
           key={source ? 'workspace' : 'start'}
-          initial={{ opacity: 0, scale: source ? 0.96 : 1.04 }}
+          // The workspace only fades in, so the top bar and the app name stay still.
+          // The start screen zooms in and out.
+          initial={{ opacity: 0, scale: source ? 1 : 1.04 }}
           animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: source ? 1.04 : 0.96 }}
+          exit={{ opacity: 0, scale: source ? 1 : 0.96 }}
           transition={{ duration: 0.25 }}
         >
           <ErrorBoundary onReset={close}>{source ? <Workspace /> : <StartScreen />}</ErrorBoundary>

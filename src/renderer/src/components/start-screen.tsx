@@ -44,12 +44,9 @@ export function StartScreen() {
         className="relative z-10 w-full max-w-xl space-y-8 px-6"
       >
         <div className="space-y-2 text-center">
-          <motion.h1
-            layoutId="brand"
-            className="bg-gradient-to-br from-white to-white/50 bg-clip-text text-6xl font-semibold tracking-tight text-transparent"
-          >
+          <h1 className="bg-gradient-to-br from-white to-white/50 bg-clip-text text-6xl font-semibold tracking-tight text-transparent">
             spiffy-diff
-          </motion.h1>
+          </h1>
           <p className="text-muted-foreground">
             spiffy-diff explains a pull request or a branch from the top down.
           </p>
