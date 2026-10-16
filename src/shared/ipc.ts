@@ -1,7 +1,7 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 import type { Focus } from './focus'
 import type { SummaryProgress } from './progress'
-import type { RerunEvent } from './rerun'
+import type { RerunEvent, RerunMode } from './rerun'
 import type { Explanation, TermEvent } from './terms'
 import type { Backend, LoadedSource } from './source'
 import type { ModelSummary, Summary } from './summary'
@@ -44,6 +44,7 @@ export interface RerunRequest {
   backend: Backend
   goalId: string
   changeId: string
+  mode: RerunMode
 }
 
 export interface StreamHandlers<T> {

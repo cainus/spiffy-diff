@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { NavState } from '@/lib/nav'
 import type { LoadRequest } from '@shared/ipc'
+import type { RerunMode } from '@shared/rerun'
 import type { Backend } from '@shared/source'
 import type { HunkOwner } from '@shared/summary'
 import type { NavAction } from '@/lib/nav'
@@ -14,8 +15,8 @@ export interface Store extends AppState {
   setBackend: (backend: Backend) => void
   close: () => void
   nav$: (action: NavAction) => void
-  /** Write one change again with the agent. `reruns` shows the progress. */
-  rerunChange: (goalId: string, changeId: string) => void
+  /** Write the notes of one change (`detail`), or all of its text (`rerun`). `reruns` shows the progress. */
+  rerunChange: (goalId: string, changeId: string, mode: RerunMode) => void
 }
 
 export const StoreContext = createContext<Store | null>(null)

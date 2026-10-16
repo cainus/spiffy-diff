@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { CodeText } from '@/components/code-text'
 import { AnimatePresence, motion } from 'motion/react'
 import { ExternalLink, RotateCw } from 'lucide-react'
@@ -24,8 +25,14 @@ export function ChangeLevel({
   change: Change
   index: Map<string, Hunk>
 }) {
-  const { source, nav$, reruns, rerunChange } = useStore()
+  const { source, summary, nav$, reruns, rerunChange } = useStore()
   const rerun = reruns[change.id]
+  const explained = summary?.detailed?.includes(change.id) ?? false
+  // The first time a change shows, the agent writes its why notes and block notes. They are cached.
+  useEffect(() => {
+    if (!explained) rerunChange(goal.id, change.id, 'detail')
+  }, [explained, goal.id, change.id, rerunChange])
+  const pending = !!rerun?.running
   const groups = groupByFile(change.hunkIds, source?.files ?? [])
 
   return (
@@ -56,14 +63,14 @@ export function ChangeLevel({
             aria-label="Rerun this change"
             title="The agent reads the code again and writes this change and its hunk notes again"
             disabled={rerun?.running}
-            onClick={() => rerunChange(goal.id, change.id)}
+            onClick={() => rerunChange(goal.id, change.id, 'rerun')}
             className="gap-1.5"
           >
             <RotateCw className={cn('size-3.5', rerun?.running && 'animate-spin')} />
             Rerun
           </Button>
           <AnimatePresence mode="wait" initial={false}>
-            {rerun?.running && (
+            {rerun?.running && rerun.mode === 'rerun' && (
               <motion.span
                 key={rerun.activity ?? 'start'}
                 role="status"
@@ -104,7 +111,13 @@ export function ChangeLevel({
             </button>
             <div className="space-y-3">
               {g.hunkIds.map((id, j) => (
-                <HunkRow key={id} file={g.file} hunkId={id} delay={240 + (i + j) * 60} />
+                <HunkRow
+                  key={id}
+                  file={g.file}
+                  hunkId={id}
+                  delay={240 + (i + j) * 60}
+                  pending={pending}
+                />
               ))}
             </div>
           </motion.section>

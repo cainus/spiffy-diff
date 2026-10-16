@@ -12,7 +12,7 @@ import {
   type SourceHead,
 } from '@shared/source'
 import type { ModelSummary, Summary } from '@shared/summary'
-import { applyRerun, type RerunEvent } from '@shared/rerun'
+import { applyRerun, type RerunDone } from '@shared/rerun'
 import { phraseKey, type Explanation } from '@shared/terms'
 import { readCachedSummary, writeCachedSummary } from './cache'
 import type { WorkspaceRequest } from './workspace'
@@ -153,7 +153,7 @@ export class Sessions {
     backend: Backend,
     goalId: string,
     changeId: string,
-    done: Extract<RerunEvent, { type: 'done' }>,
+    done: RerunDone,
   ): Promise<Summary> {
     const session = this.get(sessionId)
     if (!session.summary) throw new Error('The summary is not ready yet.')

@@ -57,19 +57,33 @@ async function collect(events: AsyncIterable<RerunEvent>): Promise<RerunEvent[]>
 }
 
 describe('rerunChange', () => {
-  it('reads the code for one change, tells what it reads, then writes the change again', async () => {
+  it('reads the code for one change, tells what it reads, then writes the change, the why notes, and the block notes', async () => {
     const model = new MockLanguageModelV4({
       doStream: async () => investigationStream(['/ws/src/retry.ts'], 'FINDING: backoff waits.'),
       doGenerate: async () =>
         generateJson({
           title: 'Add a backoff',
           description: 'The retry waits between tries.',
-          hunkNotes: [{ hunkId: 'h1', note: 'Adds the backoff time.' }],
+          hunks: [
+            {
+              hunkId: 'h1',
+              why: 'Calls failed in bursts, so the retry must wait.',
+              blocks: [{ blockId: 'h1.b1', text: 'Sets the wait time to 2 seconds.' }],
+            },
+          ],
         }),
     })
 
     const events = await collect(
-      rerunChange({ model, cwd: '/ws', source, summary, goalId: 'g1', changeId: 'g1.c1' }),
+      rerunChange({
+        model,
+        cwd: '/ws',
+        source,
+        summary,
+        goalId: 'g1',
+        changeId: 'g1.c1',
+        mode: 'rerun',
+      }),
     )
 
     expect(events).toEqual([
@@ -79,53 +93,114 @@ describe('rerunChange', () => {
         type: 'done',
         title: 'Add a backoff',
         description: 'The retry waits between tries.',
-        hunkNotes: { h1: 'Adds the backoff time.' },
+        hunkNotes: { h1: 'Calls failed in bursts, so the retry must wait.' },
+        blockNotes: { 'h1.b1': 'Sets the wait time to 2 seconds.' },
       },
     ])
     const look = JSON.stringify(model.doStreamCalls[0]!.prompt)
     expect(look).toContain('[h1] src/retry.ts')
+    expect(look).toContain('[h1.b1 NOW]')
     expect(look).not.toContain('[h2]')
     expect(look).toContain('Old title')
-    expect(JSON.stringify(model.doGenerateCalls[0]!.prompt)).toContain('FINDING: backoff waits.')
+    const write = JSON.stringify(model.doGenerateCalls[0]!.prompt)
+    expect(write).toContain('FINDING: backoff waits.')
+    expect(write).toContain('why')
   })
 
-  it('keeps only the notes of the hunks of the change', async () => {
+  it('in detail mode, keeps the title and the description and asks only for the notes', async () => {
     const model = new MockLanguageModelV4({
       doStream: async () => investigationStream([], 'notes'),
       doGenerate: async () =>
         generateJson({
-          title: 't',
-          description: 'd',
-          hunkNotes: [
-            { hunkId: 'h1', note: 'Mine.' },
-            { hunkId: 'h2', note: 'Not mine.' },
+          hunks: [{ hunkId: 'h1', why: 'Why.', blocks: [{ blockId: 'h1.b1', text: 'Now.' }] }],
+        }),
+    })
+
+    const events = await collect(
+      rerunChange({
+        model,
+        cwd: '/ws',
+        source,
+        summary,
+        goalId: 'g1',
+        changeId: 'g1.c1',
+        mode: 'detail',
+      }),
+    )
+
+    expect(events.at(-1)).toEqual({
+      type: 'done',
+      hunkNotes: { h1: 'Why.' },
+      blockNotes: { 'h1.b1': 'Now.' },
+    })
+    const format = model.doGenerateCalls[0]!.responseFormat as { schema?: { properties?: object } }
+    expect(Object.keys(format.schema?.properties ?? {})).toEqual(['hunks'])
+  })
+
+  it('keeps only the notes of the hunks and blocks of the change', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () => investigationStream([], 'notes'),
+      doGenerate: async () =>
+        generateJson({
+          hunks: [
+            {
+              hunkId: 'h1',
+              why: 'Mine.',
+              blocks: [
+                { blockId: 'h1.b1', text: 'Mine.' },
+                { blockId: 'h2.b1', text: 'No.' },
+              ],
+            },
+            { hunkId: 'h2', why: 'Not mine.', blocks: [] },
           ],
         }),
     })
 
     const events = await collect(
-      rerunChange({ model, cwd: '/ws', source, summary, goalId: 'g1', changeId: 'g1.c1' }),
+      rerunChange({
+        model,
+        cwd: '/ws',
+        source,
+        summary,
+        goalId: 'g1',
+        changeId: 'g1.c1',
+        mode: 'detail',
+      }),
     )
 
-    const done = events.at(-1)
-    expect(done?.type === 'done' && done.hunkNotes).toEqual({ h1: 'Mine.' })
+    expect(events.at(-1)).toEqual({
+      type: 'done',
+      hunkNotes: { h1: 'Mine.' },
+      blockNotes: { 'h1.b1': 'Mine.' },
+    })
   })
 
   it('rejects a change that is not in the summary', async () => {
     const model = new MockLanguageModelV4({})
     await expect(
-      collect(rerunChange({ model, cwd: '/ws', source, summary, goalId: 'g1', changeId: 'g1.c9' })),
+      collect(
+        rerunChange({
+          model,
+          cwd: '/ws',
+          source,
+          summary,
+          goalId: 'g1',
+          changeId: 'g1.c9',
+          mode: 'detail',
+        }),
+      ),
     ).rejects.toThrow('g1.c9')
   })
 })
 
 describe('applyRerun', () => {
-  it('replaces the title, the description, and the notes of one change only', () => {
+  it('replaces the text and the notes of one change, and marks the change as explained', () => {
     const next = applyRerun(summary, 'g1', 'g1.c1', {
       type: 'done',
       title: 'New',
       description: 'New text.',
       hunkNotes: { h1: 'New note.' },
+      blockNotes: { 'h1.b1': 'Block.' },
     })
 
     expect(next.goals[0]!.changes[0]).toEqual({
@@ -136,6 +211,15 @@ describe('applyRerun', () => {
     })
     expect(next.goals[0]!.changes[1]).toEqual(summary.goals[0]!.changes[1])
     expect(next.hunkNotes).toEqual({ h1: 'New note.', h2: 'Client note.' })
+    expect(next.blockNotes).toEqual({ 'h1.b1': 'Block.' })
+    expect(next.detailed).toEqual(['g1.c1'])
     expect(summary.goals[0]!.changes[0]!.title).toBe('Old title')
+  })
+
+  it('keeps the title and the description when the result has none', () => {
+    const next = applyRerun(summary, 'g1', 'g1.c1', { type: 'done', hunkNotes: {}, blockNotes: {} })
+
+    expect(next.goals[0]!.changes[0]!.title).toBe('Old title')
+    expect(next.goals[0]!.changes[0]!.description).toBe('Old text.')
   })
 })

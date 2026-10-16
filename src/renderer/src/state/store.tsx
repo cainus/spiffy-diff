@@ -12,7 +12,7 @@ import type { LoadRequest } from '@shared/ipc'
 import type { SummaryProgress } from '@shared/progress'
 import type { Backend, LoadedSource } from '@shared/source'
 import { hunkOwners, type ModelSummary, type Summary } from '@shared/summary'
-import { applyRerun, type RerunEvent } from '@shared/rerun'
+import { applyRerun, type RerunDone, type RerunMode } from '@shared/rerun'
 import { initialNav, navReducer, restoreNav, type NavAction, type NavState } from '@/lib/nav'
 import { errorText } from '@/lib/errors'
 import { StoreContext, type Store } from './use-store'
@@ -51,7 +51,7 @@ type Action =
       type: 'rerunDone'
       goalId: string
       changeId: string
-      done: Extract<RerunEvent, { type: 'done' }>
+      done: RerunDone
     }
   | { type: 'error'; error: string; runId?: number }
   | { type: 'backend'; backend: Backend }
@@ -76,6 +76,7 @@ const initial: AppState = {
 
 export interface RerunState {
   running: boolean
+  mode: RerunMode
   /** The last step of the agent. */
   activity: string | null
   error: string | null
@@ -236,23 +237,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [open])
 
   // A rerun lives in the store, so it ends well when you leave the change page.
-  const rerunChange = useCallback((goalId: string, changeId: string) => {
-    const { sessionId, backend } = latest.current
-    if (!sessionId) return
+  const rerunChange = useCallback((goalId: string, changeId: string, mode: RerunMode) => {
+    const { sessionId, backend, reruns } = latest.current
+    if (!sessionId || reruns[changeId]?.running) return
     const set = (state: RerunState | null): void => {
       if (latest.current.sessionId === sessionId) dispatch({ type: 'rerun', changeId, state })
     }
-    set({ running: true, activity: null, error: null })
+    set({ running: true, mode, activity: null, error: null })
     window.spiffy.rerunChange(
-      { sessionId, backend, goalId, changeId },
+      { sessionId, backend, goalId, changeId, mode },
       {
         onChunk: (e) => {
           if (latest.current.sessionId !== sessionId) return
-          if (e.type === 'activity') set({ running: true, activity: e.text, error: null })
+          if (e.type === 'activity') set({ running: true, mode, activity: e.text, error: null })
           else dispatch({ type: 'rerunDone', goalId, changeId, done: e })
         },
         onEnd: () => set(null),
-        onError: (m) => set({ running: false, activity: null, error: errorText(m) }),
+        onError: (m) => set({ running: false, mode, activity: null, error: errorText(m) }),
       },
     )
   }, [])

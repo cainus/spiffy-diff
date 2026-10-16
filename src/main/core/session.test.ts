@@ -244,6 +244,7 @@ describe('Sessions', () => {
       title: 'New',
       description: 'new',
       hunkNotes: { h1: 'new note' },
+      blockNotes: {},
     })
 
     expect(saved.goals[0]!.changes[0]!.title).toBe('New')
@@ -266,6 +267,7 @@ describe('Sessions', () => {
         title: 't',
         description: 'd',
         hunkNotes: {},
+        blockNotes: {},
       }),
     ).rejects.toThrow('summary')
   })

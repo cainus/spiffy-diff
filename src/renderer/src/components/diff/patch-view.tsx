@@ -10,13 +10,33 @@ interface PatchViewProps {
   /** Wait this many ms before the diff renders, so that the zoom animation ends first. */
   delay?: number
   diffStyle?: 'unified' | 'split'
+  /** The pointer enters or leaves a diff line. */
+  onLineHover?: (line: LineHover | null) => void
+}
+
+export interface LineHover {
+  side: 'deletions' | 'additions'
+  lineNumber: number
+  element: HTMLElement
+}
+
+interface LineEvent {
+  annotationSide: 'deletions' | 'additions'
+  lineNumber: number
+  lineType: string
+  lineElement: HTMLElement
 }
 
 /**
  * One file patch, rendered by @pierre/diffs. The renderer uses Shadow DOM, so it does
  * not take part in the shared-layout morph. It fades in after the card animation.
  */
-export function PatchView({ patch, delay = 220, diffStyle = 'unified' }: PatchViewProps) {
+export function PatchView({
+  patch,
+  delay = 220,
+  diffStyle = 'unified',
+  onLineHover,
+}: PatchViewProps) {
   const [show, setShow] = useState(delay === 0)
   useEffect(() => {
     if (delay === 0) return
@@ -44,6 +64,13 @@ export function PatchView({ patch, delay = 220, diffStyle = 'unified' }: PatchVi
             hunkSeparators: 'line-info',
             overflow: 'wrap',
             disableFileHeader: true,
+            onLineEnter: (e: LineEvent) =>
+              onLineHover?.(
+                e.lineType.startsWith('change-')
+                  ? { side: e.annotationSide, lineNumber: e.lineNumber, element: e.lineElement }
+                  : null,
+              ),
+            onLineLeave: () => onLineHover?.(null),
           }}
         />
       </Suspense>

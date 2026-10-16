@@ -137,6 +137,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       summary: session.summary,
       goalId: req.goalId,
       changeId: req.changeId,
+      mode: req.mode,
       abortSignal: signal,
     })
     return (async function* () {

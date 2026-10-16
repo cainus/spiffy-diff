@@ -33,7 +33,11 @@ export const modelSummarySchema = z.object({
     .array(
       z.object({
         hunkId: z.string(),
-        note: z.string().describe('What this hunk does and why, in one or two short sentences.'),
+        note: z
+          .string()
+          .describe(
+            'What this hunk changes and why that change is necessary, in one or two short sentences.',
+          ),
       }),
     )
     .describe('One note for each hunk. Write a note for every hunk ID in the diff.'),
@@ -71,6 +75,10 @@ export interface Summary {
   goals: Goal[]
   /** One explanation for each hunk ID. Summaries in an old format have none. */
   hunkNotes?: Record<string, string>
+  /** One explanation for each block ID (a run of deleted or added lines), for the hover popover. */
+  blockNotes?: Record<string, string>
+  /** The changes that have their why notes and block notes. See `RerunMode` `detail`. */
+  detailed?: string[]
 }
 
 interface DraftGoal {

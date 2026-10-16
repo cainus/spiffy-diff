@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
 import { parseDiff } from '@shared/diff'
-import type { SpiffyBridge, StreamHandlers } from '@shared/ipc'
+import type { RerunRequest, SpiffyBridge, StreamHandlers } from '@shared/ipc'
 import type { RerunEvent } from '@shared/rerun'
 import type { LoadedSource } from '@shared/source'
 import type { Summary } from '@shared/summary'
@@ -13,7 +13,13 @@ import { CHECK_EVERY_MS } from './lib/use-version-watch'
 // The diff renderer draws into Shadow DOM. The tests check which patch it gets.
 vi.mock('@pierre/diffs/react', () => ({
   PatchDiff: ({ patch, options }: { patch: string; options?: { diffStyle?: string } }) => (
-    <pre data-testid="patch" data-style={options?.diffStyle}>
+    <pre
+      data-testid="patch"
+      data-style={options?.diffStyle}
+      ref={(el) => {
+        if (el) (el as unknown as { options: unknown }).options = options
+      }}
+    >
       {patch}
     </pre>
   ),
@@ -461,8 +467,24 @@ describe('the files view', () => {
   })
 })
 
-describe('rerunning a change', () => {
-  async function openChange() {
+describe('change notes', () => {
+  function rerunWith() {
+    const runs: { req: RerunRequest; h: StreamHandlers<RerunEvent> }[] = []
+    window.spiffy.rerunChange = vi.fn((req, h) => {
+      runs.push({ req, h })
+      return () => {}
+    })
+    const last = () => runs.at(-1)!.h
+    return {
+      runs,
+      send: (e: RerunEvent) => act(() => last().onChunk(e)),
+      end: () => act(() => last().onEnd()),
+      fail: (m: string) => act(() => last().onError(m)),
+    }
+  }
+
+  async function openChange(s: Summary = summary) {
+    window.spiffy.summarize = vi.fn(async () => s)
     const user = await openPr()
     await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
     await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
@@ -470,29 +492,120 @@ describe('rerunning a change', () => {
     return user
   }
 
-  function rerunWith() {
-    let h: StreamHandlers<RerunEvent> | null = null
-    window.spiffy.rerunChange = vi.fn((_req, handlers) => {
-      h = handlers
-      return () => {}
-    })
-    return {
-      send: (e: RerunEvent) => act(() => h!.onChunk(e)),
-      end: () => act(() => h!.onEnd()),
-      fail: (m: string) => act(() => h!.onError(m)),
-    }
+  const explained: Summary = {
+    ...summary,
+    detailed: ['g1.c1'],
+    hunkNotes: { ...summary.hunkNotes, h1: 'Calls fail in bursts, so the client retries them.' },
+    blockNotes: { 'h1.b1': 'Calls the API one time.', 'h1.b2': 'Calls the API through retry.' },
   }
 
-  it('writes the change again, shows what the agent reads, and shows the new text', async () => {
+  type Hover = {
+    annotationSide: string
+    lineNumber: number
+    lineType: string
+    lineElement: HTMLElement
+  }
+  async function patchOptions() {
+    const el = await screen.findByTestId('patch')
+    return (
+      el as unknown as {
+        options: { onLineEnter: (p: Hover) => void; onLineLeave: (p: Hover) => void }
+      }
+    ).options
+  }
+  const line = (annotationSide: string, lineNumber: number, lineType: string): Hover => ({
+    annotationSide,
+    lineNumber,
+    lineType,
+    lineElement: document.body,
+  })
+
+  it('writes the why notes the first time a change shows, and shows them in the margin', async () => {
     const run = rerunWith()
-    const user = await openChange()
+    await openChange()
+
+    expect(window.spiffy.rerunChange).toHaveBeenCalledWith(
+      { sessionId: 's1', backend: 'claude', goalId: 'g1', changeId: 'g1.c1', mode: 'detail' },
+      expect.anything(),
+    )
+    expect((await screen.findByRole('status', { name: 'Why note' })).textContent).toContain(
+      'Finding why',
+    )
+
+    await run.send({
+      type: 'done',
+      hunkNotes: { h1: 'Calls fail in bursts, so the client retries them.' },
+      blockNotes: {},
+    })
+    await run.end()
+
+    expect(
+      await screen.findByText('Calls fail in bursts, so the client retries them.'),
+    ).toBeTruthy()
+    expect(screen.queryByRole('status', { name: 'Why note' })).toBeNull()
+  })
+
+  it('does not write the notes again when the summary has them', async () => {
+    rerunWith()
+    await openChange(explained)
+
+    expect(
+      await screen.findByText('Calls fail in bursts, so the client retries them.'),
+    ).toBeTruthy()
+    expect(window.spiffy.rerunChange).not.toHaveBeenCalled()
+  })
+
+  it('explains red lines with BEFORE and green lines with NOW in a popover when you hover them', async () => {
+    rerunWith()
+    await openChange(explained)
+    const options = await patchOptions()
+
+    act(() => options.onLineEnter(line('deletions', 10, 'change-deletion')))
+    expect((await screen.findByRole('tooltip')).textContent).toBe('BEFORE: Calls the API one time.')
+
+    act(() => options.onLineEnter(line('additions', 10, 'change-addition')))
+    await vi.waitFor(() =>
+      expect(screen.getByRole('tooltip').textContent).toBe('NOW: Calls the API through retry.'),
+    )
+
+    act(() => options.onLineLeave(line('additions', 10, 'change-addition')))
+    await vi.waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+  })
+
+  it('shows no popover on a context line', async () => {
+    rerunWith()
+    await openChange(explained)
+    const options = await patchOptions()
+
+    act(() => options.onLineEnter(line('additions', 3, 'context')))
+
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('tells in the popover that the agent still explains the code', async () => {
+    rerunWith()
+    await openChange()
+    const options = await patchOptions()
+
+    act(() => options.onLineEnter(line('additions', 10, 'change-addition')))
+
+    expect((await screen.findByRole('tooltip')).textContent).toContain('NOW:')
+    expect(screen.getByRole('tooltip').textContent).toContain('The agent explains this code')
+  })
+
+  it('reruns the change: shows what the agent reads, then the new text', async () => {
+    const run = rerunWith()
+    const user = await openChange(explained)
 
     await user.click(screen.getByRole('button', { name: 'Rerun this change' }))
 
-    expect(window.spiffy.rerunChange).toHaveBeenCalledWith(
-      { sessionId: 's1', backend: 'claude', goalId: 'g1', changeId: 'g1.c1' },
-      expect.anything(),
-    )
+    expect(run.runs.at(-1)!.req).toEqual({
+      sessionId: 's1',
+      backend: 'claude',
+      goalId: 'g1',
+      changeId: 'g1.c1',
+      mode: 'rerun',
+    })
     expect(screen.getByRole('button', { name: 'Rerun this change' }).hasAttribute('disabled')).toBe(
       true,
     )
@@ -506,6 +619,7 @@ describe('rerunning a change', () => {
       title: 'Add a backoff',
       description: 'The retry waits.',
       hunkNotes: { h1: 'Waits between tries.' },
+      blockNotes: {},
     })
     await run.end()
 
@@ -519,7 +633,7 @@ describe('rerunning a change', () => {
 
   it('shows the error and keeps the old change when the rerun fails', async () => {
     const run = rerunWith()
-    const user = await openChange()
+    const user = await openChange(explained)
     await user.click(screen.getByRole('button', { name: 'Rerun this change' }))
 
     await run.fail('rate limit')
