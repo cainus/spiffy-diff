@@ -1,7 +1,6 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { RotateCw, X } from 'lucide-react'
-import { AgentPanel } from '@/components/agent/agent-panel'
 import { BackendPicker } from '@/components/backend-picker'
 import { FilesView } from '@/components/files/files-view'
 import { SummaryView } from '@/components/summary/summary-view'
@@ -20,6 +19,11 @@ import { breadcrumbs, type NavState } from '@/lib/nav'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/state/use-store'
+
+// The agent panel pulls in Streamdown and Shiki. It loads after the summary view.
+const AgentPanel = lazy(() =>
+  import('@/components/agent/agent-panel').then((m) => ({ default: m.AgentPanel })),
+)
 
 function isTyping(target: EventTarget | null): boolean {
   return (
@@ -144,7 +148,9 @@ export function Workspace() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize="32%" minSize="20%">
-          <AgentPanel />
+          <Suspense fallback={null}>
+            <AgentPanel />
+          </Suspense>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

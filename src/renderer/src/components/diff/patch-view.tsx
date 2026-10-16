@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { PatchDiff } from '@pierre/diffs/react'
 import { Skeleton } from '@/components/ui/skeleton'
+
+// The diff renderer and its Shiki grammars load on first use, not at app start.
+const PatchDiff = lazy(() => import('@pierre/diffs/react').then((m) => ({ default: m.PatchDiff })))
 
 interface PatchViewProps {
   patch: string
@@ -22,7 +24,8 @@ export function PatchView({ patch, delay = 220, diffStyle = 'unified' }: PatchVi
     return () => clearTimeout(t)
   }, [delay])
 
-  if (!show) return <Skeleton className="h-24 w-full rounded-lg" />
+  const skeleton = <Skeleton className="h-24 w-full rounded-lg" />
+  if (!show) return skeleton
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -30,18 +33,20 @@ export function PatchView({ patch, delay = 220, diffStyle = 'unified' }: PatchVi
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="overflow-hidden rounded-lg border"
     >
-      <PatchDiff
-        patch={patch}
-        options={{
-          theme: { dark: 'pierre-dark', light: 'pierre-light' },
-          themeType: 'dark',
-          diffStyle,
-          lineDiffType: 'word-alt',
-          hunkSeparators: 'line-info',
-          overflow: 'wrap',
-          disableFileHeader: true,
-        }}
-      />
+      <Suspense fallback={skeleton}>
+        <PatchDiff
+          patch={patch}
+          options={{
+            theme: { dark: 'pierre-dark', light: 'pierre-light' },
+            themeType: 'dark',
+            diffStyle,
+            lineDiffType: 'word-alt',
+            hunkSeparators: 'line-info',
+            overflow: 'wrap',
+            disableFileHeader: true,
+          }}
+        />
+      </Suspense>
     </motion.div>
   )
 }
