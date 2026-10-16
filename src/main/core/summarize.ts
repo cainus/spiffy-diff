@@ -6,7 +6,7 @@ import type { LoadedSource } from '@shared/source'
 import { STE_RULES } from './style'
 import { buildSummary, modelSummarySchema, type ModelSummary, type Summary } from '@shared/summary'
 
-export type PartialSummary = DeepPartial<ModelSummary>
+type PartialSummary = DeepPartial<ModelSummary>
 
 export interface SummarizeOptions {
   model: LanguageModel

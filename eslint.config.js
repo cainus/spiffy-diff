@@ -10,6 +10,7 @@ export default tseslint.config(
       'out/**',
       'dist/**',
       'release/**',
+      'scratch/**',
       'src/renderer/src/components/ui/**',
       'src/renderer/src/components/ai-elements/**',
     ],

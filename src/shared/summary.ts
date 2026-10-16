@@ -40,7 +40,7 @@ export interface Change {
   hunkIds: string[]
 }
 
-export type GoalKind = 'model' | 'other' | 'noise'
+type GoalKind = 'model' | 'other' | 'noise'
 
 export interface Goal {
   id: string

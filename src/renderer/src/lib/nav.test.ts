@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Summary } from '@shared/summary'
-import { breadcrumbs, currentFocus, initialNav, navReducer, type NavState } from './nav'
+import { breadcrumbs, currentFocus, focusLabel, initialNav, navReducer, type NavState } from './nav'
 
 const summary: Summary = {
   overview: '',
@@ -95,5 +95,19 @@ describe('breadcrumbs', () => {
     expect(breadcrumbs(run({ type: 'drillIn', goalId: 'g1' }), null).map((c) => c.label)).toEqual([
       'Overview',
     ])
+  })
+})
+
+describe('focusLabel', () => {
+  it('names the deepest summary level', () => {
+    expect(focusLabel(run({ type: 'drillIn', goalId: 'g1', changeId: 'g1.c1' }), summary)).toBe(
+      'Change: Wrap',
+    )
+    expect(focusLabel(run({ type: 'drillIn', goalId: 'g1' }), summary)).toBe('Goal: Retry')
+    expect(focusLabel(initialNav, summary)).toBe('Overview')
+  })
+
+  it('names the file in the files view', () => {
+    expect(focusLabel(run({ type: 'openFile', path: 'src/a.ts' }), summary)).toBe('File: src/a.ts')
   })
 })

@@ -53,3 +53,16 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     return null
   }
 }
+
+/** A mutable holder for the turn context. The chat panel updates it after each render. */
+export class ContextBox {
+  private value: TurnContext = { sessionId: '', backend: 'claude', focus: { level: 'source' } }
+
+  get(): TurnContext {
+    return this.value
+  }
+
+  set(value: TurnContext): void {
+    this.value = value
+  }
+}

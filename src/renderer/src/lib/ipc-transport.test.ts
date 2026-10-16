@@ -1,7 +1,7 @@
 import type { UIMessageChunk } from 'ai'
 import { describe, expect, it } from 'vitest'
 import type { ChatTurnRequest, SpiffyBridge, StreamHandlers } from '@shared/ipc'
-import { IpcChatTransport } from './ipc-transport'
+import { ContextBox, IpcChatTransport } from './ipc-transport'
 
 type ChatFn = SpiffyBridge['chat']
 
@@ -73,5 +73,18 @@ describe('IpcChatTransport', () => {
     expect(cancelled).toBe(true)
     expect(handlers).toBeDefined()
     await expect(collect(stream)).resolves.toEqual([])
+  })
+})
+
+describe('ContextBox', () => {
+  it('returns the last context that was set', () => {
+    const box = new ContextBox()
+    box.set({ sessionId: 's9', backend: 'codex', focus: { level: 'file', path: 'a.ts' } })
+
+    expect(box.get()).toEqual({
+      sessionId: 's9',
+      backend: 'codex',
+      focus: { level: 'file', path: 'a.ts' },
+    })
   })
 })

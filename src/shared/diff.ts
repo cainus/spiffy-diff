@@ -1,4 +1,4 @@
-export type FileStatus = 'added' | 'deleted' | 'modified' | 'renamed'
+type FileStatus = 'added' | 'deleted' | 'modified' | 'renamed'
 
 export interface Hunk {
   id: string

@@ -92,3 +92,13 @@ export function breadcrumbs(state: NavState, summary: Summary | null): Crumb[] {
   }
   return crumbs
 }
+
+/** The short text of the focus chip in the agent panel. */
+export function focusLabel(state: NavState, summary: Summary | null): string {
+  if (state.mode === 'files' && state.file) return `File: ${state.file}`
+  const crumbs = breadcrumbs(state, summary)
+  const last = crumbs[crumbs.length - 1]!
+  if (last.focus.level === 'change') return `Change: ${last.label}`
+  if (last.focus.level === 'goal') return `Goal: ${last.label}`
+  return last.label
+}

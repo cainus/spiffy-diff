@@ -1,0 +1,133 @@
+import { useLayoutEffect, useState } from 'react'
+import { useChat } from '@ai-sdk/react'
+import { AnimatePresence, motion } from 'motion/react'
+import { Crosshair, Sparkles } from 'lucide-react'
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from '@/components/ai-elements/conversation'
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+} from '@/components/ai-elements/prompt-input'
+import { Shimmer } from '@/components/ai-elements/shimmer'
+import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion'
+import { ContextBox, IpcChatTransport } from '@/lib/ipc-transport'
+import { currentFocus, focusLabel } from '@/lib/nav'
+import { spring } from '@/lib/motion'
+import { useStore } from '@/state/use-store'
+
+const SUGGESTIONS = {
+  source: [
+    'What is the risk of these changes?',
+    'Which tests cover these changes?',
+    'What must I review first?',
+  ],
+  goal: ['Why is this goal necessary?', 'What can break?', 'Is a part of this goal missing?'],
+  change: ['Explain this code step by step.', 'What calls this code?', 'Is there a simpler way?'],
+  file: ['Explain the changes in this file.', 'What uses this file?'],
+} as const
+
+/** One conversation for each source. Each message sends the current focus. See PLAN.md decision 7. */
+export function AgentPanel() {
+  const store = useStore()
+  const focus = currentFocus(store.nav)
+  // The transport reads the context at send time, never during render.
+  const [box] = useState(() => new ContextBox())
+  useLayoutEffect(() => {
+    box.set({ sessionId: store.sessionId ?? '', backend: store.backend, focus })
+  })
+  const [transport] = useState(() => new IpcChatTransport(window.spiffy, () => box.get()))
+  const { messages, sendMessage, status, stop, error } = useChat({
+    id: store.sessionId ?? 'none',
+    transport,
+  })
+  const label = focusLabel(store.nav, store.summary)
+
+  const ask = (text: string) => {
+    if (text.trim()) void sendMessage({ text })
+  }
+
+  return (
+    <div className="bg-sidebar/30 flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b px-4 py-3">
+        <Sparkles className="text-primary size-4" />
+        <span className="text-sm font-medium">Agent</span>
+        <span className="text-muted-foreground ml-auto text-xs capitalize">{store.backend}</span>
+      </div>
+
+      <Conversation className="min-h-0 flex-1">
+        <ConversationContent>
+          {messages.length === 0 ? (
+            <ConversationEmptyState
+              title="Ask about these changes"
+              description="The agent can read the files of the head commit. It cannot change files."
+            />
+          ) : (
+            messages.map((m) => (
+              <motion.div
+                key={m.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={spring}
+              >
+                <Message from={m.role}>
+                  <MessageContent>
+                    {m.parts.map((p, i) =>
+                      p.type === 'text' ? (
+                        <MessageResponse key={i}>{p.text}</MessageResponse>
+                      ) : null,
+                    )}
+                  </MessageContent>
+                </Message>
+              </motion.div>
+            ))
+          )}
+          {status === 'submitted' && <Shimmer className="text-sm">The agent thinks…</Shimmer>}
+          {error && <p className="text-destructive text-sm">{error.message}</p>}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      <div className="space-y-2 border-t p-3">
+        <Suggestions>
+          {SUGGESTIONS[focus.level].map((s) => (
+            <Suggestion key={s} suggestion={s} onClick={ask} />
+          ))}
+        </Suggestions>
+        <PromptInput onSubmit={(m) => ask(m.text)}>
+          <PromptInputBody>
+            <PromptInputTextarea placeholder="Ask a question…" />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={label}
+                  layout
+                  initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.9 }}
+                  transition={spring}
+                  className="bg-primary/10 text-primary inline-flex max-w-56 items-center gap-1 truncate rounded-full px-2 py-0.5 text-[11px]"
+                  title={label}
+                >
+                  <Crosshair className="size-3 shrink-0" />
+                  <span className="truncate">{label}</span>
+                </motion.span>
+              </AnimatePresence>
+            </PromptInputTools>
+            <PromptInputSubmit status={status} onStop={() => void stop()} />
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
+    </div>
+  )
+}

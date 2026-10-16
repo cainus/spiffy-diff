@@ -38,7 +38,7 @@ export async function defaultBranch(cwd: string): Promise<string> {
 }
 
 /** The GitHub `owner/name` of the repo, or the folder name when there is no GitHub remote. */
-export async function repoName(cwd: string): Promise<string> {
+async function repoName(cwd: string): Promise<string> {
   try {
     const url = await gitLine(cwd, 'remote', 'get-url', 'origin')
     const m = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(url)

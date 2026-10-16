@@ -128,3 +128,57 @@
     @apply font-sans;
   }
 }
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  p,
+  pre,
+  code,
+  h1,
+  h2,
+  [data-selectable] {
+    user-select: text;
+  }
+}
+
+.app-drag {
+  -webkit-app-region: drag;
+}
+.app-no-drag,
+.app-drag button,
+.app-drag a {
+  -webkit-app-region: no-drag;
+}
+
+.spiffy-glow {
+  background:
+    radial-gradient(
+      600px circle at 30% 20%,
+      color-mix(in oklab, var(--primary) 18%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      500px circle at 75% 70%,
+      color-mix(in oklab, #8b5cf6 16%, transparent),
+      transparent 60%
+    );
+  animation: spiffy-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes spiffy-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2%, 2%, 0) scale(1.08);
+  }
+}
