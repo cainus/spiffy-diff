@@ -115,7 +115,64 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
     prompt: `${sourceIntro(source)}\n\n${body}`,
   })
   for await (const partial of result.partialOutputStream) {
-    opts.onPartial?.(partial)
+    if (isWellFormed(partial)) opts.onPartial?.(partial)
   }
-  return buildSummary(await result.output, source.files)
+  return buildSummary(await finalObject(result), source.files)
+}
+
+function isWellFormed(p: unknown): p is PartialSummary {
+  if (typeof p !== 'object' || p === null) return false
+  const { overview, goals } = p as Record<string, unknown>
+  return (
+    (overview === undefined || typeof overview === 'string') &&
+    (goals === undefined || Array.isArray(goals))
+  )
+}
+
+async function finalObject(result: {
+  output: PromiseLike<ModelSummary>
+  text: PromiseLike<string>
+}): Promise<ModelSummary> {
+  try {
+    return await result.output
+  } catch (error) {
+    const recovered = lastValidObject(await result.text)
+    if (recovered) return recovered
+    throw error
+  }
+}
+
+/**
+ * Some providers send broken text before the real JSON object, for example
+ * `{"goals": {"overview": ...}}` or an incomplete object followed by the full one.
+ * This returns the last balanced JSON object in the text that matches the schema.
+ */
+function lastValidObject(text: string): ModelSummary | null {
+  let found: ModelSummary | null = null
+  for (let start = text.indexOf('{'); start !== -1; start = text.indexOf('{', start + 1)) {
+    const end = matchingBrace(text, start)
+    if (end === -1) continue
+    try {
+      const parsed = modelSummarySchema.safeParse(JSON.parse(text.slice(start, end + 1)))
+      if (parsed.success) found = parsed.data
+    } catch {
+      // Not JSON. Try the next brace.
+    }
+  }
+  return found
+}
+
+function matchingBrace(text: string, start: number): number {
+  let depth = 0
+  let inString = false
+  for (let i = start; i < text.length; i++) {
+    const c = text[i]
+    if (inString) {
+      if (c === '\\') i++
+      else if (c === '"') inString = false
+    } else if (c === '"') inString = true
+    else if (c === '{') depth++
+    else if (c === '}' && --depth === 0) return i
+  }
+  return -1
 }

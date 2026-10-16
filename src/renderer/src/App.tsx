@@ -1,12 +1,13 @@
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import { StartScreen } from '@/components/start-screen'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { Workspace } from '@/components/workspace'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { StoreProvider } from '@/state/store'
 import { useStore } from '@/state/use-store'
 
 function Screens() {
-  const { source } = useStore()
+  const { source, close } = useStore()
   return (
     <LayoutGroup>
       <AnimatePresence mode="wait">
@@ -17,7 +18,7 @@ function Screens() {
           exit={{ opacity: 0, scale: source ? 1.04 : 0.96 }}
           transition={{ duration: 0.25 }}
         >
-          {source ? <Workspace /> : <StartScreen />}
+          <ErrorBoundary onReset={close}>{source ? <Workspace /> : <StartScreen />}</ErrorBoundary>
         </motion.div>
       </AnimatePresence>
     </LayoutGroup>

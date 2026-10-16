@@ -28,7 +28,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       }),
     ensureWorkspace,
     summarize: async (source, cwd, backend, onPartial) =>
-      summarize(source, { model: await createModel(backend, cwd), onPartial }),
+      summarize(source, { model: await createModel(backend, cwd, 'summary'), onPartial }),
   })
 
   ipcMain.handle('source:load', (_e, req: LoadRequest) => sessions.load(req))
@@ -53,7 +53,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
         const session = sessions.get(req.sessionId)
         const cwd = await sessions.workspace(req.sessionId)
         const stream = await chatStream({
-          model: await createModel(req.backend, cwd),
+          model: await createModel(req.backend, cwd, 'chat'),
           source: session.source,
           summary: session.summary ?? null,
           messages: req.messages,

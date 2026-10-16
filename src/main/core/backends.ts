@@ -3,22 +3,23 @@ import { claudeCode, type ClaudeCodeSettings } from 'ai-sdk-provider-claude-code
 import { codexCli, listModels, type CodexCliSettings } from 'ai-sdk-provider-codex-cli'
 import type { Backend } from '@shared/source'
 
-/** The agent is read-only. See PLAN.md decision 5. */
-export function claudeSettings(cwd: string): ClaudeCodeSettings {
+export type Purpose = 'summary' | 'chat'
+
+const READ_TOOLS = ['Read', 'Grep', 'Glob']
+
+/**
+ * The agent is read-only. See PLAN.md decision 5.
+ * `tools` is the full tool set, so no write tool exists.
+ * The summary pass gets no tools: with tools, Claude can answer in more than one turn,
+ * and the provider joins the turns into text that is not one JSON object.
+ */
+export function claudeSettings(cwd: string, purpose: Purpose): ClaudeCodeSettings {
+  const tools = purpose === 'chat' ? READ_TOOLS : []
   return {
     cwd,
     permissionMode: 'default',
-    allowedTools: ['Read', 'Grep', 'Glob', 'LS'],
-    disallowedTools: [
-      'Write',
-      'Edit',
-      'MultiEdit',
-      'NotebookEdit',
-      'Bash',
-      'WebFetch',
-      'WebSearch',
-      'Task',
-    ],
+    tools,
+    allowedTools: tools,
     settingSources: [],
     mcpServers: {},
   }
@@ -44,8 +45,12 @@ export function pickCodexModel(models: CodexModelInfo[]): string {
 let codexModel: Promise<string> | undefined
 
 /** Make the language model for a backend. The model works in `cwd`. */
-export async function createModel(backend: Backend, cwd: string): Promise<LanguageModel> {
-  if (backend === 'claude') return claudeCode('sonnet', claudeSettings(cwd))
+export async function createModel(
+  backend: Backend,
+  cwd: string,
+  purpose: Purpose,
+): Promise<LanguageModel> {
+  if (backend === 'claude') return claudeCode('sonnet', claudeSettings(cwd, purpose))
   codexModel ??= listModels().then((r) => pickCodexModel(r.models))
   return codexCli(await codexModel, codexSettings(cwd))
 }

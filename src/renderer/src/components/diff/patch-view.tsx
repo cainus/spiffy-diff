@@ -39,6 +39,7 @@ export function PatchView({ patch, delay = 220, diffStyle = 'unified' }: PatchVi
           lineDiffType: 'word-alt',
           hunkSeparators: 'line-info',
           overflow: 'wrap',
+          disableFileHeader: true,
         }}
       />
     </motion.div>

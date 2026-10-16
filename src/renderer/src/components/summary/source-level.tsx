@@ -46,7 +46,7 @@ export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
                   onOpen={() => nav$({ type: 'drillIn', goalId: goal.id })}
                 />
               ))
-            : (partial?.goals ?? []).map((g, i) => (
+            : (Array.isArray(partial?.goals) ? partial.goals : []).map((g, i) => (
                 <motion.div
                   key={i}
                   layout

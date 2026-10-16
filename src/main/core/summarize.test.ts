@@ -130,6 +130,38 @@ describe('summarize', () => {
     expect(JSON.stringify(model.doStreamCalls[0]!.prompt)).toContain('Calls fail sometimes.')
   })
 
+  it('recovers the summary when the provider sends a broken prefix before the full JSON object', async () => {
+    const full = JSON.stringify({ overview: 'Adds retry.', goals: answer.goals })
+    const model = new MockLanguageModelV4({ doStream: async () => streamJson(`{"goals": ${full}`) })
+
+    const summary = await summarize(source, { model })
+
+    expect(summary.overview).toBe('Adds retry.')
+    expect(summary.goals[0]!.title).toBe('Retry failed calls')
+  })
+
+  it('recovers the summary when the provider sends an incomplete object and then the full object', async () => {
+    const partial = JSON.stringify({ goals: answer.goals })
+    const full = JSON.stringify(answer)
+    const model = new MockLanguageModelV4({ doStream: async () => streamJson(partial + full) })
+
+    const summary = await summarize(source, { model })
+
+    expect(summary.overview).toBe('Adds retry.')
+  })
+
+  it('passes on only partial summaries that have the right shape', async () => {
+    const full = JSON.stringify(answer)
+    const model = new MockLanguageModelV4({ doStream: async () => streamJson(`{"goals": ${full}`) })
+    const partials: unknown[] = []
+
+    await summarize(source, { model, onPartial: (p) => partials.push(p) })
+
+    for (const p of partials) {
+      expect(Array.isArray((p as { goals?: unknown }).goals ?? [])).toBe(true)
+    }
+  })
+
   it('tells the model to write in ASD-STE100', async () => {
     const model = new MockLanguageModelV4({
       doStream: async () => streamJson(JSON.stringify(answer)),

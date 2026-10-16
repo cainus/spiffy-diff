@@ -2,16 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { claudeSettings, codexSettings, pickCodexModel } from './backends'
 
 describe('claudeSettings', () => {
-  it('runs in the workspace with read-only tools and without user settings or MCP servers', () => {
-    const s = claudeSettings('/ws')
+  it('gives the chat agent only read-only tools in the workspace, without user settings or MCP servers', () => {
+    const s = claudeSettings('/ws', 'chat')
 
     expect(s.cwd).toBe('/ws')
-    expect(s.allowedTools).toEqual(['Read', 'Grep', 'Glob', 'LS'])
-    expect(s.disallowedTools).toEqual(
-      expect.arrayContaining(['Write', 'Edit', 'Bash', 'NotebookEdit', 'WebFetch']),
-    )
+    expect(s.tools).toEqual(['Read', 'Grep', 'Glob'])
+    expect(s.allowedTools).toEqual(['Read', 'Grep', 'Glob'])
+    expect(s.disallowedTools).toBeUndefined()
     expect(s.settingSources).toEqual([])
     expect(s.mcpServers).toEqual({})
+  })
+
+  it('gives the summary pass no tools, so that the answer is one JSON object', () => {
+    const s = claudeSettings('/ws', 'summary')
+
+    expect(s.tools).toEqual([])
+    expect(s.allowedTools).toEqual([])
   })
 })
 
