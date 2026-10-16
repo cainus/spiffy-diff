@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { claudeSettings, codexSettings, findOnPath, pickCodexModel } from './backends'
+import {
+  claudeExecutable,
+  claudeSettings,
+  codexSettings,
+  findOnPath,
+  pickCodexModel,
+} from './backends'
 
 describe('claudeSettings', () => {
   it('gives the chat agent only read-only tools in the workspace, without user settings or MCP servers', () => {
@@ -83,5 +89,24 @@ describe('findOnPath', () => {
 
     expect(findOnPath('claude', `${a}:${b}`)).toBe(join(b, 'claude'))
     expect(findOnPath('nope', `${a}:${b}`)).toBeUndefined()
+  })
+})
+
+describe('claudeExecutable', () => {
+  it('returns the installed claude program', async () => {
+    const { mkdtempSync, writeFileSync, chmodSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'spiffy-path-'))
+    writeFileSync(join(dir, 'claude'), '#!/bin/sh\n')
+    chmodSync(join(dir, 'claude'), 0o755)
+
+    expect(claudeExecutable(dir)).toBe(join(dir, 'claude'))
+  })
+
+  it('tells you to install Claude Code when it is not on the PATH', () => {
+    expect(() => claudeExecutable('/nonexistent')).toThrow(
+      'Spiffy cannot find Claude Code. Install it from https://claude.com/claude-code, then run `claude` one time to log in.',
+    )
   })
 })

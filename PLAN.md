@@ -61,5 +61,4 @@ All phases are done:
 - Claude can stream broken JSON for structured output. Spiffy recovers the last valid object. The summary pass has no tools for this reason, so it does not read files.
 - Tune the 100k-token limit for map-reduce with real PRs. A forced map-reduce run on sindresorhus/is#215 (27 hunks, Codex) gave 3 goals and covered every hunk.
 - `~/.spiffy/worktrees` and `~/.spiffy/repos` grow. They need an expiry rule.
-- The packaged app includes the bundled Claude Code binary (about 220 MB) as a fallback. Spiffy uses the `claude` program on the PATH first.
 - The app has no icon and no code signature.

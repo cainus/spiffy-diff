@@ -18,7 +18,7 @@ Words in this project have the meanings in [CONTEXT.md](CONTEXT.md). Decisions a
 - macOS, Node.js 22 or later, git.
 - The `gh` CLI, logged in (`gh auth login`). Spiffy reads pull requests with it.
 - One or both agent programs, logged in:
-  - Claude Code: `claude` (run `claude` one time to log in).
+  - Claude Code: `claude` (run `claude` one time to log in). Spiffy requires it. It does not include its own copy.
   - Codex: `codex` (run `codex login`).
 
 Spiffy uses the programs in your login shell PATH. It does not ask for API keys.
