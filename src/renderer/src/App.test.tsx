@@ -192,6 +192,39 @@ describe('the summary steps', () => {
   })
 })
 
+describe('drilling out', () => {
+  it('goes up one level with the Back button', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    await vi.waitFor(() =>
+      expect(within(screen.getByRole('navigation')).queryByText('Wrap the call')).toBeNull(),
+    )
+    expect(within(screen.getByRole('navigation')).getByText('Retry failed calls')).toBeTruthy()
+  })
+
+  it('has no Back button at the top level', async () => {
+    await openPr()
+
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+  })
+
+  it('goes up one level with Cmd+[', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await screen.findByRole('button', { name: /Wrap the call/ })
+
+    await user.keyboard('{Meta>}[[{/Meta}')
+
+    await vi.waitFor(() =>
+      expect(within(screen.getByRole('navigation')).queryByText('Retry failed calls')).toBeNull(),
+    )
+  })
+})
+
 describe('the files view', () => {
   it('lists every file and links each hunk to its change', async () => {
     const user = await openPr()

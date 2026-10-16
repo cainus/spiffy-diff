@@ -144,3 +144,16 @@ describe('the agent panel', () => {
     ).toBeTruthy()
   })
 })
+
+describe('drilling out from the agent box', () => {
+  it('goes up one level with Escape while the agent box has the focus', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await screen.findByText('Goal: Retry failed calls')
+    screen.getByPlaceholderText('Ask a question…').focus()
+
+    await user.keyboard('{Escape}')
+
+    expect(await screen.findByTitle('Overview')).toBeTruthy()
+  })
+})

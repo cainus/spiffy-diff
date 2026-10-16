@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { RotateCw, X } from 'lucide-react'
+import { ArrowLeft, RotateCw, X } from 'lucide-react'
 import { BackendPicker } from '@/components/backend-picker'
 import { FilesView } from '@/components/files/files-view'
 import { LocalCopyButton } from '@/components/local-copy-button'
@@ -39,25 +39,52 @@ export function Workspace() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        e.preventDefault()
-        nav$({ type: 'drillOut' })
-      }
+      const typing = isTyping(e.target)
+      // Escape drills out from anywhere. In a text box it also takes the focus away.
+      const escape = e.key === 'Escape' && !e.defaultPrevented
+      const back = (e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft')
+      const backspace = e.key === 'Backspace' && !typing
+      if (!escape && !back && !backspace) return
+      e.preventDefault()
+      if (typing && e.target instanceof HTMLElement) e.target.blur()
+      nav$({ type: 'drillOut' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [nav$])
 
   const crumbs = breadcrumbs(nav, summary)
+  const canGoBack = nav.mode === 'files' || nav.path.level !== 'source'
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="app-drag flex h-12 shrink-0 items-center gap-4 border-b pr-3 pl-20">
+      {/* Only empty header space drags the window. Drag regions can take clicks from controls inside them. */}
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b pr-3">
+        <div className="app-drag w-20 self-stretch" />
         <motion.span layoutId="brand" className="text-sm font-semibold tracking-tight">
           spiffy
         </motion.span>
-        <Breadcrumb className="app-no-drag min-w-0 flex-1">
+        <AnimatePresence initial={false}>
+          {canGoBack && (
+            <motion.div
+              initial={{ opacity: 0, width: 0, scale: 0.6 }}
+              animate={{ opacity: 1, width: 'auto', scale: 1 }}
+              exit={{ opacity: 0, width: 0, scale: 0.6 }}
+              transition={spring}
+            >
+              <Button
+                size="icon-sm"
+                variant="outline"
+                aria-label="Back"
+                title="Back (Esc, ⌘[)"
+                onClick={() => nav$({ type: 'drillOut' })}
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <Breadcrumb className="min-w-0 shrink">
           <BreadcrumbList className="flex-nowrap">
             <AnimatePresence initial={false} mode="popLayout">
               {crumbs.map((c, i) => {
@@ -93,7 +120,8 @@ export function Workspace() {
             </AnimatePresence>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="app-no-drag flex items-center gap-3">
+        <div className="app-drag min-w-4 flex-1 self-stretch" />
+        <div className="flex items-center gap-3">
           <ModeToggle mode={nav.mode} onChange={(mode) => nav$({ type: 'mode', mode })} />
           <LocalCopyButton />
           <BackendPicker onChange={(b) => b !== store.backend && void store.resummarize(b)} />
