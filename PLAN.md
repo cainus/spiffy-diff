@@ -44,23 +44,22 @@ Words in this file have the meanings in `CONTEXT.md`.
 
 ## Phases
 
-1. Skeleton. Repo, tooling, quality gates, an empty window.
-2. Diff core (TDD). Parse a unified diff into files and hunks. Give hunk
-   IDs. Find noise. Check coverage. Make cache keys.
-3. Source resolution (TDD). Parse PR URLs. Read PR data with `gh`. Find the
-   base for a branch source. Make the workspace.
-4. Summary generation. Prompt, zod schema, single pass, map-reduce, cache.
-5. Summary UI. Zoom stack, breadcrumb, goal cards, change list, hunk view,
-   animations.
-6. Files view. File tree, `@pierre/diffs` viewer, hunk badges, links into the
-   summary.
-7. Agent. IPC chat transport, focus chip, read-only tools in the workspace,
-   backend picker (Claude / Codex).
-8. Polish. Settings, errors, empty states, packaging.
+All phases are done:
+
+1. Skeleton, tooling, quality gates.
+2. Diff core: hunks, hunk IDs, noise, coverage, cache keys.
+3. Sources: PR URLs, `gh`, branch base, workspaces, local copies.
+4. Summary generation: prompt, schema, single pass, map-reduce, cache, recovery from broken provider JSON.
+5. Summary UI: zoom stack, breadcrumb, animations.
+6. Files view: file list, diffs, hunk badges.
+7. Agent: IPC chat transport, focus chip, read-only tools, Claude / Codex.
+8. Packaging (`npm run dist`, unsigned).
 
 ## Open items
 
 - Codex does not stream partial objects. Goal cards appear all at once for Codex.
-
-- Tune the 100k-token limit with real PRs.
-- Clean up worktrees when spiffy starts (from a crash in an earlier run).
+- Claude can stream broken JSON for structured output. Spiffy recovers the last valid object. The summary pass has no tools for this reason, so it does not read files.
+- Tune the 100k-token limit for map-reduce with real PRs. Spiffy has not run map-reduce on a real PR yet.
+- `~/.spiffy/worktrees` and `~/.spiffy/repos` grow. They need an expiry rule.
+- The packaged app includes the bundled Claude Code binary (about 220 MB) as a fallback. Spiffy uses the `claude` program on the PATH first.
+- The app has no icon and no code signature.
