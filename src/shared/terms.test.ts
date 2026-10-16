@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { splitTerms, termQuestion, type Term } from './terms'
+import { parseMarkedTerms, splitTerms, type Term } from './terms'
 
 const terms: Term[] = [
   { term: 'PA', kind: 'business' },
@@ -38,16 +38,45 @@ describe('splitTerms', () => {
   })
 })
 
-describe('termQuestion', () => {
-  it('asks a different question for each kind of term', () => {
-    expect(termQuestion({ term: 'migration', kind: 'jargon' })).toBe(
-      'What does the technical term "migration" mean? Explain it simply, and say how these changes use it.',
-    )
-    expect(termQuestion({ term: 'removal_owed', kind: 'code' })).toBe(
-      'Explain the code concept "removal_owed" in this repository. Find where it is defined and what uses it.',
-    )
-    expect(termQuestion({ term: 'PA', kind: 'business' })).toBe(
-      'Explain the business concept "PA" as this repository uses it. Find where the code uses it.',
-    )
+describe('parseMarkedTerms', () => {
+  it('turns [[term|kind]] markers into term parts and keeps the plain text', () => {
+    expect(
+      parseMarkedTerms(
+        'A [[migration|jargon]] fills [[TaskTarget|code]] rows for the [[PA|business]].',
+      ),
+    ).toEqual([
+      { text: 'A ' },
+      { text: 'migration', term: { term: 'migration', kind: 'jargon' } },
+      { text: ' fills ' },
+      { text: 'TaskTarget', term: { term: 'TaskTarget', kind: 'code' } },
+      { text: ' rows for the ' },
+      { text: 'PA', term: { term: 'PA', kind: 'business' } },
+      { text: '.' },
+    ])
+  })
+
+  it('shows a marker with an unknown kind as plain text', () => {
+    expect(parseMarkedTerms('A [[thing|other]] here.')).toEqual([{ text: 'A thing here.' }])
+  })
+
+  it('hides an incomplete marker at the end of streaming text', () => {
+    expect(parseMarkedTerms('It uses a [[migr')).toEqual([{ text: 'It uses a ' }])
+    expect(parseMarkedTerms('It uses a [[migration|jar')).toEqual([{ text: 'It uses a ' }])
+  })
+
+  it('treats a `backticked` name as a code term, except the term that the text explains', () => {
+    expect(parseMarkedTerms('`TargetSpec` lists `tags` for a site.', 'TargetSpec')).toEqual([
+      { text: 'TargetSpec lists ' },
+      { text: 'tags', term: { term: 'tags', kind: 'code' } },
+      { text: ' for a site.' },
+    ])
+  })
+
+  it('hides an incomplete backtick span at the end of streaming text', () => {
+    expect(parseMarkedTerms('It sets `sla3_pa')).toEqual([{ text: 'It sets ' }])
+  })
+
+  it('returns plain text when there are no markers', () => {
+    expect(parseMarkedTerms('Plain.')).toEqual([{ text: 'Plain.' }])
   })
 })

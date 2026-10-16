@@ -2,13 +2,15 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { dialog, ipcMain, type BrowserWindow } from 'electron'
 import type { UIMessageChunk } from 'ai'
-import type { ChatTurnRequest, LoadRequest, SimplifyRequest } from '@shared/ipc'
+import type { ChatTurnRequest, LoadRequest, SimplifyRequest, TermRequest } from '@shared/ipc'
+import type { TermEvent } from '@shared/terms'
 import type { Backend } from '@shared/source'
 import { createModel } from './core/backends'
 import { chatStream } from './core/chat'
 import { listBranches, loadBranchSource, repoName } from './core/git'
 import { findOpenPr, loadPrSource, runGh } from './core/github'
 import { Sessions } from './core/session'
+import { explainTerm } from './core/explain-term'
 import { simplify } from './core/simplify'
 import { summarize } from './core/summarize'
 import { ensureWorkspace } from './core/workspace'
@@ -91,6 +93,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       model: await createModel(req.backend, cwd),
       title: req.title,
       text: req.text,
+      abortSignal: signal,
+    })
+  })
+
+  serveStream<TermRequest, TermEvent>('term', async (req, signal) => {
+    const session = sessions.get(req.sessionId)
+    const cwd = await sessions.workspace(req.sessionId)
+    return explainTerm({
+      model: await createModel(req.backend, cwd),
+      cwd,
+      title: session.source.title,
+      term: req.term,
+      context: req.context,
       abortSignal: signal,
     })
   })

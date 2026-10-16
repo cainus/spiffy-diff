@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { UIMessageChunk } from 'ai'
 import type { SpiffyBridge, StreamHandlers } from '@shared/ipc'
+import type { TermEvent } from '@shared/terms'
 import type { SummaryProgress } from '@shared/progress'
 
 let nextId = 0
@@ -57,6 +58,7 @@ const api: SpiffyBridge = {
 
   chat: (req, handlers) => stream<UIMessageChunk>('chat', req, handlers),
   simplify: (req, handlers) => stream<string>('simplify', req, handlers),
+  explainTerm: (req, handlers) => stream<TermEvent>('term', req, handlers),
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
   listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),

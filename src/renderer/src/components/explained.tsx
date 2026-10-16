@@ -1,47 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Baby, Loader2 } from 'lucide-react'
-import { splitTerms, termQuestion, type Term } from '@shared/terms'
+import { splitTerms } from '@shared/terms'
+import { TermButton } from '@/components/term-popup'
 import { errorText } from '@/lib/errors'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/state/use-store'
 
-const KIND_LABEL: Record<Term['kind'], string> = {
-  jargon: 'technical term',
-  code: 'code concept',
-  business: 'business concept',
-}
-
-const KIND_STYLE: Record<Term['kind'], string> = {
-  jargon: 'decoration-sky-400/70 decoration-dotted',
-  code: 'decoration-emerald-400/70 decoration-solid font-mono text-[0.92em]',
-  business: 'decoration-amber-400/80 decoration-wavy',
-}
-
-/** Text with underlined terms. A click on a term asks the agent about it. */
+/** Text with underlined terms. A click on a term opens a popup where the agent explains it. */
 export function TermText({ text }: { text: string }) {
-  const { summary, ask } = useStore()
+  const { summary } = useStore()
   return (
     <>
       {splitTerms(text, summary?.terms ?? []).map((part, i) =>
         part.term ? (
-          <button
-            key={i}
-            type="button"
-            aria-label={`Ask about the ${KIND_LABEL[part.term.kind]} ${part.term.term}`}
-            title={`Ask the agent about this ${KIND_LABEL[part.term.kind]}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              ask(termQuestion(part.term!))
-            }}
-            className={cn(
-              'hover:text-foreground cursor-help underline underline-offset-4 transition-colors',
-              KIND_STYLE[part.term.kind],
-            )}
-          >
+          <TermButton key={i} term={part.term} context={text}>
             {part.text}
-          </button>
+          </TermButton>
         ) : (
           <span key={i}>{part.text}</span>
         ),

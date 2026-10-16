@@ -9,6 +9,10 @@ export interface Term {
   kind: 'jargon' | 'code' | 'business'
 }
 
+/** One event while the agent explains a term. `reset` clears text that narrated the search. */
+export type TermEvent =
+  { type: 'activity'; text: string } | { type: 'text'; delta: string } | { type: 'reset' }
+
 export interface TermPart {
   text: string
   term?: Term
@@ -40,14 +44,44 @@ export function splitTerms(text: string, terms: Term[]): TermPart[] {
   return parts.length ? parts : [{ text }]
 }
 
-/** The question that the agent gets when you click a term. */
-export function termQuestion(t: Term): string {
-  switch (t.kind) {
-    case 'jargon':
-      return `What does the technical term "${t.term}" mean? Explain it simply, and say how these changes use it.`
-    case 'code':
-      return `Explain the code concept "${t.term}" in this repository. Find where it is defined and what uses it.`
-    case 'business':
-      return `Explain the business concept "${t.term}" as this repository uses it. Find where the code uses it.`
+const KINDS = new Set<Term['kind']>(['jargon', 'code', 'business'])
+
+/**
+ * Parse text with inline term markers, `[[term|kind]]`. The agent writes these in term explanations.
+ * A name in backticks is a code term too, except `exclude` (the term that the text explains).
+ * An incomplete marker or backtick span at the end (the text still streams) is hidden.
+ */
+export function parseMarkedTerms(text: string, exclude?: string): TermPart[] {
+  let visible = text
+  const open = visible.lastIndexOf('[[')
+  if (open !== -1 && visible.indexOf(']]', open) === -1) visible = visible.slice(0, open)
+  if ((visible.match(/`/g) ?? []).length % 2 === 1)
+    visible = visible.slice(0, visible.lastIndexOf('`'))
+
+  const parts: TermPart[] = []
+  const plain = (s: string): void => {
+    if (!s) return
+    const last = parts[parts.length - 1]
+    if (last && !last.term) last.text += s
+    else parts.push({ text: s })
   }
+  const termPart = (term: string, kind: Term['kind']): void => {
+    if (exclude && term.toLowerCase() === exclude.toLowerCase()) plain(term)
+    else parts.push({ text: term, term: { term, kind } })
+  }
+  let at = 0
+  for (const m of visible.matchAll(/\[\[([^\]|]+)\|([^\]]+)\]\]|`([^`]+)`/g)) {
+    plain(visible.slice(at, m.index))
+    if (m[3] !== undefined) {
+      termPart(m[3].trim(), 'code')
+    } else {
+      const term = m[1]!.trim()
+      const kind = m[2]!.trim() as Term['kind']
+      if (KINDS.has(kind)) termPart(term, kind)
+      else plain(term)
+    }
+    at = m.index + m[0].length
+  }
+  plain(visible.slice(at))
+  return parts.length ? parts : [{ text: '' }]
 }

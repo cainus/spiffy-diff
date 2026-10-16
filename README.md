@@ -48,7 +48,7 @@ The app is not signed.
   - "Include uncommitted changes" adds your working tree to the current branch.
 - Click a goal to drill in. Click a change to see its code.
 - **ELI5** beside an explanation asks the agent to explain it again as for a child. Click it again to hide it.
-- Underlined words are terms you can ask about. A click sends the question to the agent panel:
+- Underlined words are terms. A click opens a popup where the agent explains the term. It shows what the agent reads while it works. Terms in the popup are underlined too: a click explains them in the same popup, and the back arrow returns.
   - dotted blue: technical jargon
   - green, monospace: internal code concepts
   - wavy amber: internal business concepts

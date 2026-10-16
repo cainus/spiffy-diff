@@ -18,8 +18,6 @@ export interface AppState {
   summary: Summary | null
   partial: DeepPartial<ModelSummary> | null
   progress: SummaryProgress | null
-  /** A question for the agent panel from outside it, for example a term click. */
-  question: { id: number; text: string } | null
   /** The number of the latest summary run. */
   runId: number
   backend: Backend
@@ -32,7 +30,6 @@ type Action =
   | { type: 'summarizing'; runId: number }
   | { type: 'partial'; partial: DeepPartial<ModelSummary>; runId: number }
   | { type: 'progress'; progress: SummaryProgress; runId: number }
-  | { type: 'ask'; text: string }
   | { type: 'summary'; summary: Summary; runId: number }
   | { type: 'error'; error: string; runId?: number }
   | { type: 'backend'; backend: Backend }
@@ -47,7 +44,6 @@ const initial: AppState = {
   summary: null,
   partial: null,
   progress: null,
-  question: null,
   runId: 0,
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
@@ -78,8 +74,6 @@ function reducer(state: AppState, action: Action): AppState {
         error: null,
         nav: initialNav,
       }
-    case 'ask':
-      return { ...state, question: { id: (state.question?.id ?? 0) + 1, text: action.text } }
     case 'progress':
       return { ...state, progress: action.progress }
     case 'partial':
@@ -166,7 +160,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setBackend,
       close: () => dispatch({ type: 'close' }),
       nav$: (action) => dispatch({ type: 'nav', action }),
-      ask: (text) => dispatch({ type: 'ask', text }),
     }),
     [state, owners, open, resummarize, setBackend],
   )

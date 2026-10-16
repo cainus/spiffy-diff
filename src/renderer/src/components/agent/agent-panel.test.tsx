@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseDiff } from '@shared/diff'
 import type { SpiffyBridge } from '@shared/ipc'
 import type { LoadedSource } from '@shared/source'
 import type { Summary } from '@shared/summary'
+import type { TermEvent } from '@shared/terms'
 import { App } from '@/App'
 
 // The diff renderer draws into Shadow DOM. The tests check which patch it gets.
@@ -75,6 +76,7 @@ function fakeBridge(): SpiffyBridge {
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
     simplify: vi.fn(() => () => {}),
+    explainTerm: vi.fn(() => () => {}),
     linkRepo: vi.fn(async () => {}),
   }
 }
@@ -167,28 +169,117 @@ describe('drilling out from the agent box', () => {
 })
 
 describe('terms', () => {
-  it('underlines terms in an explanation and asks the agent about a term you click', async () => {
+  function explainWith(answers: Record<string, TermEvent[]>) {
+    const pending: Record<string, () => void> = {}
+    bridge.explainTerm = vi.fn((req, h) => {
+      const events = answers[req.term.term] ?? []
+      pending[req.term.term] = () => {
+        for (const e of events) h.onChunk(e)
+        h.onEnd()
+      }
+      return () => {}
+    })
+    return (term: string) => act(() => pending[term]!())
+  }
+
+  it('explains a term in a popup with a progress indicator, not in the agent panel', async () => {
+    const finish = explainWith({
+      client: [
+        { type: 'activity', text: 'Reading src/client.ts' },
+        { type: 'text', delta: 'The client sends [[HTTP|jargon]] calls.' },
+      ],
+    })
     const user = await openPr()
 
     await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
 
+    const popup = await screen.findByRole('dialog', { name: 'client' })
+    expect(within(popup).getByRole('status').textContent).toContain('The agent reads the code')
+    finish('client')
+    await vi.waitFor(() => expect(popup.textContent).toContain('The client sends HTTP calls.'))
+    expect(within(popup).queryByRole('status')).toBeNull()
+    expect(bridge.explainTerm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 's1',
+        backend: 'claude',
+        term: { term: 'client', kind: 'code' },
+        context: 'The change adds retry to the client.',
+      }),
+      expect.anything(),
+    )
+    expect(bridge.chat).not.toHaveBeenCalled()
+  })
+
+  it('shows the same explanation at once when you open the term again', async () => {
+    const finish = explainWith({ client: [{ type: 'text', delta: 'The client sends calls.' }] })
+    const user = await openPr()
+    const word = screen.getByRole('button', { name: 'Ask about the code concept client' })
+    await user.click(word)
+    finish('client')
     await vi.waitFor(() =>
-      expect(bridge.chat).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            expect.objectContaining({
-              parts: [
-                {
-                  type: 'text',
-                  text: 'Explain the code concept "client" in this repository. Find where it is defined and what uses it.',
-                },
-              ],
-            }),
-          ],
-        }),
-        expect.anything(),
+      expect(screen.getByRole('dialog', { name: 'client' }).textContent).toContain(
+        'The client sends calls.',
       ),
     )
+
+    await user.keyboard('{Escape}')
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await user.click(word)
+
+    expect((await screen.findByRole('dialog', { name: 'client' })).textContent).toContain(
+      'The client sends calls.',
+    )
+    expect(bridge.explainTerm).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows what the agent reads while it works', async () => {
+    explainWith({ client: [] })
+    bridge.explainTerm = vi.fn((_req, h) => {
+      queueMicrotask(() => h.onChunk({ type: 'activity', text: 'Reading src/client.ts' }))
+      return () => {}
+    })
+    const user = await openPr()
+
+    await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
+
+    const popup = await screen.findByRole('dialog', { name: 'client' })
+    await vi.waitFor(() =>
+      expect(within(popup).getByRole('status').textContent).toContain('Reading src/client.ts'),
+    )
+  })
+
+  it('underlines terms in the popup, and explains them in the same popup with a way back', async () => {
+    const finish = explainWith({
+      client: [{ type: 'text', delta: 'The client sends [[HTTP|jargon]] calls.' }],
+      HTTP: [{ type: 'text', delta: 'HTTP is how programs talk on the web.' }],
+    })
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: 'Ask about the code concept client' }))
+    const popup = await screen.findByRole('dialog', { name: 'client' })
+    finish('client')
+
+    await user.click(
+      await within(popup).findByRole('button', { name: 'Ask about the technical term HTTP' }),
+    )
+    finish('HTTP')
+
+    const inner = await screen.findByRole('dialog', { name: 'HTTP' })
+    await vi.waitFor(() =>
+      expect(inner.textContent).toContain('HTTP is how programs talk on the web.'),
+    )
+    expect(bridge.explainTerm).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        term: { term: 'HTTP', kind: 'jargon' },
+        context: 'The client sends HTTP calls.',
+      }),
+      expect.anything(),
+    )
+
+    await user.click(within(inner).getByRole('button', { name: 'Back to client' }))
+
+    const back = await screen.findByRole('dialog', { name: 'client' })
+    expect(back.textContent).toContain('The client sends HTTP calls.')
+    expect(bridge.explainTerm).toHaveBeenCalledTimes(2)
   })
 })
 

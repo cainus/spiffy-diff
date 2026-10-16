@@ -1,6 +1,7 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 import type { Focus } from './focus'
 import type { SummaryProgress } from './progress'
+import type { Term, TermEvent } from './terms'
 import type { Backend, LoadedSource } from './source'
 import type { ModelSummary, Summary } from './summary'
 import type { DeepPartial } from 'ai'
@@ -28,6 +29,14 @@ export interface SimplifyRequest {
   text: string
 }
 
+export interface TermRequest {
+  sessionId: string
+  backend: Backend
+  term: Term
+  /** The text where the user found the term. */
+  context: string
+}
+
 export interface StreamHandlers<T> {
   onChunk: (chunk: T) => void
   onEnd: () => void
@@ -53,6 +62,8 @@ export interface SpiffyBridge {
   listBranches(repoPath: string): Promise<BranchList>
   /** Explain a text again as for a child (ELI5). The chunks are text. */
   simplify(req: SimplifyRequest, handlers: StreamHandlers<string>): () => void
+  /** Explain one term. The agent reads the code first. */
+  explainTerm(req: TermRequest, handlers: StreamHandlers<TermEvent>): () => void
   /** Use a local copy of the repository as the agent's workspace. */
   linkRepo(sessionId: string, repoPath: string): Promise<void>
 }
