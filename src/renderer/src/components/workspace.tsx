@@ -124,7 +124,11 @@ export function Workspace() {
               {error ? (
                 <span className="text-destructive">{error}</span>
               ) : (
-                <Shimmer>The agent makes the summary…</Shimmer>
+                <Shimmer>
+                  {store.step === 'investigating'
+                    ? 'The agent reads the code to find why it changed…'
+                    : 'The agent makes the summary…'}
+                </Shimmer>
               )}
             </div>
           </motion.div>

@@ -28,15 +28,23 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       }),
     ensureWorkspace,
     repoName,
-    summarize: async (source, cwd, backend, onPartial) =>
-      summarize(source, { model: await createModel(backend, cwd, 'summary'), onPartial }),
+    summarize: async (source, cwd, backend, onPartial, onStep) =>
+      summarize(source, {
+        model: await createModel(backend, cwd),
+        onPartial,
+        onStep,
+        investigate: true,
+      }),
   })
 
   ipcMain.handle('source:load', (_e, req: LoadRequest) => sessions.load(req))
 
   ipcMain.handle('summary:run', (e, reqId: string, sessionId: string, backend: Backend) =>
-    sessions.summarize(sessionId, backend, (partial) =>
-      e.sender.send('summary:partial', reqId, partial),
+    sessions.summarize(
+      sessionId,
+      backend,
+      (partial) => e.sender.send('summary:partial', reqId, partial),
+      (step) => e.sender.send('summary:step', reqId, step),
     ),
   )
 
@@ -54,7 +62,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
         const session = sessions.get(req.sessionId)
         const cwd = await sessions.workspace(req.sessionId)
         const stream = await chatStream({
-          model: await createModel(req.backend, cwd, 'chat'),
+          model: await createModel(req.backend, cwd),
           source: session.source,
           summary: session.summary ?? null,
           messages: req.messages,

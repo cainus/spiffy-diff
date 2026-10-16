@@ -8,8 +8,8 @@ import {
 } from './backends'
 
 describe('claudeSettings', () => {
-  it('gives the chat agent only read-only tools in the workspace, without user settings or MCP servers', () => {
-    const s = claudeSettings('/ws', 'chat')
+  it('gives the agent only read-only tools in the workspace, for the summary and the chat, without user settings or MCP servers', () => {
+    const s = claudeSettings('/ws')
 
     expect(s.cwd).toBe('/ws')
     expect(s.tools).toEqual(['Read', 'Grep', 'Glob'])
@@ -20,25 +20,16 @@ describe('claudeSettings', () => {
   })
 
   it('replaces the Claude Code system prompt with a read-only reviewer prompt that has the STE rules', () => {
-    for (const purpose of ['chat', 'summary'] as const) {
-      const prompt = String(claudeSettings('/ws', purpose).systemPrompt)
-      expect(prompt).toContain('ASD-STE100')
-      expect(prompt).toContain('You cannot change files')
-    }
+    const prompt = String(claudeSettings('/ws').systemPrompt)
+    expect(prompt).toContain('ASD-STE100')
+    expect(prompt).toContain('You cannot change files')
   })
 
   it('uses the claude program that you installed when one is given', () => {
-    expect(
-      claudeSettings('/ws', 'chat', '/opt/homebrew/bin/claude').pathToClaudeCodeExecutable,
-    ).toBe('/opt/homebrew/bin/claude')
-    expect(claudeSettings('/ws', 'chat').pathToClaudeCodeExecutable).toBeUndefined()
-  })
-
-  it('gives the summary pass no tools, so that the answer is one JSON object', () => {
-    const s = claudeSettings('/ws', 'summary')
-
-    expect(s.tools).toEqual([])
-    expect(s.allowedTools).toEqual([])
+    expect(claudeSettings('/ws', '/opt/homebrew/bin/claude').pathToClaudeCodeExecutable).toBe(
+      '/opt/homebrew/bin/claude',
+    )
+    expect(claudeSettings('/ws').pathToClaudeCodeExecutable).toBeUndefined()
   })
 })
 

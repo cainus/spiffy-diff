@@ -26,6 +26,8 @@ export interface StreamHandlers<T> {
   onError: (message: string) => void
 }
 
+export type SummaryStep = 'investigating' | 'summarizing'
+
 export interface BranchList {
   current: string
   branches: string[]
@@ -38,6 +40,7 @@ export interface SpiffyBridge {
     sessionId: string,
     backend: Backend,
     onPartial: (partial: DeepPartial<ModelSummary>) => void,
+    onStep?: (step: SummaryStep) => void,
   ): Promise<Summary>
   chat(req: ChatTurnRequest, handlers: StreamHandlers<UIMessageChunk>): () => void
   pickRepoFolder(): Promise<string | null>

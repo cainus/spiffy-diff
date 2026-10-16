@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
 import type { DeepPartial } from 'ai'
-import type { LoadRequest } from '@shared/ipc'
+import type { LoadRequest, SummaryStep } from '@shared/ipc'
 import type { Backend, LoadedSource } from '@shared/source'
 import { hunkOwners, type ModelSummary, type Summary } from '@shared/summary'
 import { initialNav, navReducer, type NavAction, type NavState } from '@/lib/nav'
@@ -16,6 +16,7 @@ export interface AppState {
   source: LoadedSource | null
   summary: Summary | null
   partial: DeepPartial<ModelSummary> | null
+  step: SummaryStep | null
   backend: Backend
   nav: NavState
 }
@@ -25,6 +26,7 @@ type Action =
   | { type: 'loaded'; sessionId: string; source: LoadedSource }
   | { type: 'summarizing' }
   | { type: 'partial'; partial: DeepPartial<ModelSummary> }
+  | { type: 'step'; step: SummaryStep }
   | { type: 'summary'; summary: Summary }
   | { type: 'error'; error: string }
   | { type: 'backend'; backend: Backend }
@@ -38,6 +40,7 @@ const initial: AppState = {
   source: null,
   summary: null,
   partial: null,
+  step: null,
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
 }
@@ -54,9 +57,12 @@ function reducer(state: AppState, action: Action): AppState {
         status: 'summarizing',
         summary: null,
         partial: null,
+        step: null,
         error: null,
         nav: initialNav,
       }
+    case 'step':
+      return { ...state, step: action.step }
     case 'partial':
       return { ...state, partial: action.partial }
     case 'summary':
@@ -82,8 +88,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const run = useCallback(async (sessionId: string, backend: Backend) => {
     dispatch({ type: 'summarizing' })
     try {
-      const summary = await window.spiffy.summarize(sessionId, backend, (partial) =>
-        dispatch({ type: 'partial', partial }),
+      const summary = await window.spiffy.summarize(
+        sessionId,
+        backend,
+        (partial) => dispatch({ type: 'partial', partial }),
+        (step) => dispatch({ type: 'step', step }),
       )
       dispatch({ type: 'summary', summary })
     } catch (e) {

@@ -162,6 +162,44 @@ describe('summarize', () => {
     }
   })
 
+  it('first reads the code to find why it changed, then builds the summary from those findings', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => ({
+        content: [
+          {
+            type: 'text' as const,
+            text: 'FINDING: retry exists because the payment API drops calls.',
+          },
+        ],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage,
+        warnings: [],
+      }),
+      doStream: async () => streamJson(JSON.stringify(answer)),
+    })
+
+    const summary = await summarize(source, { model, investigate: true })
+
+    const investigation = JSON.stringify(model.doGenerateCalls[0]!.prompt)
+    expect(investigation).toContain('working directory')
+    expect(investigation).toContain('[h2] src/client.ts')
+    const structured = JSON.stringify(model.doStreamCalls[0]!.prompt)
+    expect(structured).toContain('FINDING: retry exists because the payment API drops calls.')
+    expect(summary.goals[0]!.title).toBe('Retry failed calls')
+  })
+
+  it('reports the investigation step before the summary streams', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => generateJson('notes'),
+      doStream: async () => streamJson(JSON.stringify(answer)),
+    })
+    const steps: string[] = []
+
+    await summarize(source, { model, investigate: true, onStep: (s) => steps.push(s) })
+
+    expect(steps).toEqual(['investigating', 'summarizing'])
+  })
+
   it('tells the model to write in ASD-STE100', async () => {
     const model = new MockLanguageModelV4({
       doStream: async () => streamJson(JSON.stringify(answer)),

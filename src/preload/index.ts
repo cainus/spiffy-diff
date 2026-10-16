@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { UIMessageChunk } from 'ai'
-import type { SpiffyBridge } from '@shared/ipc'
+import type { SpiffyBridge, SummaryStep } from '@shared/ipc'
 
 let nextId = 0
 const newId = (): string => `${Date.now()}-${nextId++}`
@@ -20,13 +20,16 @@ function listen<A extends unknown[]>(
 const api: SpiffyBridge = {
   loadSource: (req) => ipcRenderer.invoke('source:load', req),
 
-  async summarize(sessionId, backend, onPartial) {
+  async summarize(sessionId, backend, onPartial, onStep) {
     const reqId = newId()
-    const stop = listen('summary:partial', reqId, onPartial)
+    const stops = [
+      listen('summary:partial', reqId, onPartial),
+      listen('summary:step', reqId, (step: SummaryStep) => onStep?.(step)),
+    ]
     try {
       return await ipcRenderer.invoke('summary:run', reqId, sessionId, backend)
     } finally {
-      stop()
+      stops.forEach((s) => s())
     }
   },
 

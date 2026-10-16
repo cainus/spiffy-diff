@@ -95,7 +95,12 @@ describe('the summary', () => {
     await openPr()
 
     expect(screen.getByRole('button', { name: /Retry failed calls/ })).toBeTruthy()
-    expect(window.spiffy.summarize).toHaveBeenCalledWith('s1', 'claude', expect.any(Function))
+    expect(window.spiffy.summarize).toHaveBeenCalledWith(
+      's1',
+      'claude',
+      expect.any(Function),
+      expect.any(Function),
+    )
   })
 
   it('drills in from a goal to a change and shows only the code of that change', async () => {
@@ -140,6 +145,24 @@ describe('the summary', () => {
     )
 
     expect(await screen.findByRole('button', { name: /Retry failed calls/ })).toBeTruthy()
+  })
+})
+
+describe('the summary steps', () => {
+  it('says that the agent reads the code during the investigation step', async () => {
+    let finish: (s: Summary) => void = () => {}
+    window.spiffy.summarize = vi.fn((_id, _backend, _onPartial, onStep) => {
+      onStep?.('investigating')
+      return new Promise<Summary>((r) => (finish = r))
+    })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByPlaceholderText(/github.com/), 'https://github.com/o/r/pull/1')
+    await user.click(screen.getByRole('button', { name: 'Explain' }))
+
+    expect(await screen.findByText('The agent reads the code to find why it changed…')).toBeTruthy()
+    finish(summary)
+    expect(await screen.findByText('The change adds retry to the client.')).toBeTruthy()
   })
 })
 

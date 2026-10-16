@@ -6,8 +6,6 @@ import { codexCli, listModels, type CodexCliSettings } from 'ai-sdk-provider-cod
 import type { Backend } from '@shared/source'
 import { STE_RULES } from './style'
 
-export type Purpose = 'summary' | 'chat'
-
 const READ_TOOLS = ['Read', 'Grep', 'Glob']
 
 /** Replaces the Claude Code preset, which is for an agent that edits code. */
@@ -18,15 +16,11 @@ ${STE_RULES}`
 /**
  * The agent is read-only. See PLAN.md decision 5.
  * `tools` is the full tool set, so no write tool exists.
- * The summary pass gets no tools: with tools, Claude can answer in more than one turn,
- * and the provider joins the turns into text that is not one JSON object.
+ * The summary pass and the chat both read files. With tools, Claude answers in more than one turn,
+ * and the provider can join the turns into broken JSON. `summarize` recovers the last valid object.
  */
-export function claudeSettings(
-  cwd: string,
-  purpose: Purpose,
-  executable?: string,
-): ClaudeCodeSettings {
-  const tools = purpose === 'chat' ? READ_TOOLS : []
+export function claudeSettings(cwd: string, executable?: string): ClaudeCodeSettings {
+  const tools = READ_TOOLS
   return {
     cwd,
     permissionMode: 'default',
@@ -90,14 +84,8 @@ export function claudeExecutable(path = process.env['PATH'] ?? ''): string {
 let codexModel: Promise<string> | undefined
 
 /** Make the language model for a backend. The model works in `cwd`. */
-export async function createModel(
-  backend: Backend,
-  cwd: string,
-  purpose: Purpose,
-): Promise<LanguageModel> {
-  // Use the claude program that the user installed and logged in to. The bundled binary is the fallback.
-  if (backend === 'claude')
-    return claudeCode('sonnet', claudeSettings(cwd, purpose, findOnPath('claude')))
+export async function createModel(backend: Backend, cwd: string): Promise<LanguageModel> {
+  if (backend === 'claude') return claudeCode('sonnet', claudeSettings(cwd, claudeExecutable()))
   // Use the codex program that the user installed and logged in to. The bundled copy is the fallback,
   // and it cannot start from inside a packaged app.
   const codexPath = findOnPath('codex')

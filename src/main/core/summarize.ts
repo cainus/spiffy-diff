@@ -15,8 +15,17 @@ export interface SummarizeOptions {
   /** How many file summaries run at the same time in map-reduce. */
   concurrency?: number
   onPartial?: (partial: PartialSummary) => void
+  /** Read the code with tools first, to find why it changed. */
+  investigate?: boolean
+  onStep?: (step: 'investigating' | 'summarizing') => void
   abortSignal?: AbortSignal
 }
+
+const INVESTIGATE = `You prepare notes for a code reviewer.
+Your working directory has the files of the head commit. The hunks show only what changed.
+Use your tools: read each changed file around its hunks, find the callers of changed functions, and find the tests.
+Find why each change exists and what it affects.
+Write short notes. Name the hunk IDs and the file paths. Do not change files.`
 
 const DEFAULT_BUDGET = 100_000
 
@@ -26,6 +35,7 @@ Put the most important goal first. Use few goals: one to five for most changes.
 For each goal, list the changes. A change is one related set of code edits that serves the goal.
 Attach hunks to changes with their hunk IDs, for example "h3". Use only hunk IDs that you see.
 Attach every hunk to at least one change.
+Use the findings from the code to write why each change exists, not only what it does.
 
 ${STE_RULES}`
 
@@ -107,12 +117,25 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
       ? `Hunks:\n\n${promptHunks(source.files)}`
       : `The changes are too large to show in full. These are summaries of each file and each hunk:\n\n${await digestFiles(source, opts)}`
 
+  let findings = ''
+  if (opts.investigate) {
+    opts.onStep?.('investigating')
+    const { text } = await generateText({
+      model: opts.model,
+      system: INVESTIGATE,
+      abortSignal: opts.abortSignal,
+      prompt: `${sourceIntro(source)}\n\n${body}`,
+    })
+    findings = `Findings from reading the code:\n${text.trim()}\n\n`
+  }
+  opts.onStep?.('summarizing')
+
   const result = streamText({
     model: opts.model,
     system: INSTRUCTIONS,
     output: Output.object({ schema: modelSummarySchema }),
     abortSignal: opts.abortSignal,
-    prompt: `${sourceIntro(source)}\n\n${body}`,
+    prompt: `${sourceIntro(source)}\n\n${findings}${body}`,
   })
   for await (const partial of result.partialOutputStream) {
     if (isWellFormed(partial)) opts.onPartial?.(partial)
