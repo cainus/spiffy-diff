@@ -39,6 +39,7 @@ function deps(overrides: Partial<SessionDeps> = {}): SessionDeps & { calls: stri
       )
       return '/ws'
     },
+    repoName: async (path) => (path === '/code/r' ? 'o/r' : 'other/repo'),
     summarize: async (_source, cwd) => {
       calls.push(`summarize ${cwd}`)
       return summary
@@ -104,6 +105,28 @@ describe('Sessions', () => {
     })
 
     expect(await sessions.workspace(sessionId)).toBe('/code/r')
+  })
+
+  it('uses a local copy that you select for a PR, and remembers it for the next PR', async () => {
+    const d = deps()
+    const sessions = new Sessions(d)
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+
+    await sessions.linkRepo(sessionId, '/code/r')
+    await sessions.workspace(sessionId)
+    const next = await new Sessions(d).load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+    await new Sessions(d).workspace(next.sessionId).catch(() => {})
+
+    expect(d.calls).toContain('workspace /code/r h pull/3/head')
+  })
+
+  it('refuses a local copy of a different repository', async () => {
+    const sessions = new Sessions(deps())
+    const { sessionId } = await sessions.load({ kind: 'pr', url: 'https://github.com/o/r/pull/3' })
+
+    await expect(sessions.linkRepo(sessionId, '/code/elsewhere')).rejects.toThrow(
+      'The folder /code/elsewhere is a copy of other/repo, not o/r.',
+    )
   })
 
   it('rejects an unknown session ID', async () => {

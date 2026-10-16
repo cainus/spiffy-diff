@@ -70,6 +70,7 @@ function fakeBridge(): SpiffyBridge {
     chat: vi.fn(() => () => {}),
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
+    linkRepo: vi.fn(async () => {}),
   }
 }
 

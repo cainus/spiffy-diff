@@ -4,6 +4,7 @@ import type { LoadRequest } from '@shared/ipc'
 import type { Backend, LoadedSource } from '@shared/source'
 import { hunkOwners, type ModelSummary, type Summary } from '@shared/summary'
 import { initialNav, navReducer, type NavAction, type NavState } from '@/lib/nav'
+import { errorText } from '@/lib/errors'
 import { StoreContext, type Store } from './use-store'
 
 type Status = 'idle' | 'loading' | 'summarizing' | 'ready' | 'error'
@@ -71,11 +72,6 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-function message(e: unknown): string {
-  const text = e instanceof Error ? e.message : String(e)
-  return text.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-}
-
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial)
   const latest = useRef(state)
@@ -91,7 +87,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       )
       dispatch({ type: 'summary', summary })
     } catch (e) {
-      dispatch({ type: 'error', error: message(e) })
+      dispatch({ type: 'error', error: errorText(e) })
     }
   }, [])
 
@@ -103,7 +99,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'loaded', sessionId, source })
         await run(sessionId, latest.current.backend)
       } catch (e) {
-        dispatch({ type: 'error', error: message(e) })
+        dispatch({ type: 'error', error: errorText(e) })
       }
     },
     [run],

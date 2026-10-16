@@ -18,6 +18,8 @@ export interface SessionDeps {
     includeUncommitted: boolean,
   ) => Promise<LoadedSource>
   ensureWorkspace: (req: WorkspaceRequest) => Promise<string>
+  /** The GitHub `owner/name` of a local folder. */
+  repoName: (path: string) => Promise<string>
   summarize: (
     source: LoadedSource,
     cwd: string,
@@ -60,6 +62,17 @@ export class Sessions {
     const session = this.get(sessionId)
     session.workspace ??= this.makeWorkspace(session)
     return session.workspace
+  }
+
+  /** Use a local copy of the repository for this source and for later sources of the same repository. */
+  async linkRepo(sessionId: string, path: string): Promise<void> {
+    const session = this.get(sessionId)
+    const name = await this.deps.repoName(path)
+    if (name !== session.source.repo) {
+      throw new Error(`The folder ${path} is a copy of ${name}, not ${session.source.repo}.`)
+    }
+    await this.rememberRepo(name, path)
+    session.workspace = undefined
   }
 
   async summarize(

@@ -72,6 +72,7 @@ function fakeBridge(): SpiffyBridge {
     chat: vi.fn(() => () => {}),
     pickRepoFolder: vi.fn(async () => null),
     listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
+    linkRepo: vi.fn(async () => {}),
   }
 }
 
@@ -153,5 +154,31 @@ describe('the files view', () => {
     )
 
     expect(await screen.findByRole('heading', { name: 'Wrap the call' })).toBeTruthy()
+  })
+})
+
+describe('the local copy', () => {
+  it('uses a folder that you select as the workspace of a PR', async () => {
+    window.spiffy.pickRepoFolder = vi.fn(async () => '/code/r')
+    const user = await openPr()
+
+    await user.click(screen.getByRole('button', { name: 'Use a local copy' }))
+
+    expect(window.spiffy.linkRepo).toHaveBeenCalledWith('s1', '/code/r')
+    expect(await screen.findByTitle('Local copy: /code/r')).toBeTruthy()
+  })
+
+  it('shows why spiffy refuses a folder', async () => {
+    window.spiffy.pickRepoFolder = vi.fn(async () => '/code/x')
+    window.spiffy.linkRepo = vi.fn(async () => {
+      throw new Error(
+        "Error invoking remote method 'repo:link': Error: The folder /code/x is a copy of a/b, not o/r.",
+      )
+    })
+    const user = await openPr()
+
+    await user.click(screen.getByRole('button', { name: 'Use a local copy' }))
+
+    expect(await screen.findByText('The folder /code/x is a copy of a/b, not o/r.')).toBeTruthy()
   })
 })

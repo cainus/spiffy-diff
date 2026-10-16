@@ -7,7 +7,7 @@ import type { LoadRequest } from '@shared/ipc'
 import type { Backend } from '@shared/source'
 import { createModel } from './core/backends'
 import { chatStream } from './core/chat'
-import { listBranches, loadBranchSource } from './core/git'
+import { listBranches, loadBranchSource, repoName } from './core/git'
 import { findOpenPr, loadPrSource, runGh } from './core/github'
 import { Sessions } from './core/session'
 import { summarize } from './core/summarize'
@@ -27,6 +27,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
         findPr: (cwd, b) => findOpenPr(cwd, b, runGh),
       }),
     ensureWorkspace,
+    repoName,
     summarize: async (source, cwd, backend, onPartial) =>
       summarize(source, { model: await createModel(backend, cwd, 'summary'), onPartial }),
   })
@@ -82,5 +83,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
+  ipcMain.handle('repo:link', (_e, sessionId: string, path: string) =>
+    sessions.linkRepo(sessionId, path),
+  )
   ipcMain.handle('repo:branches', (_e, repoPath: string) => listBranches(repoPath))
 }

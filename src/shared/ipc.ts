@@ -42,4 +42,6 @@ export interface SpiffyBridge {
   chat(req: ChatTurnRequest, handlers: StreamHandlers<UIMessageChunk>): () => void
   pickRepoFolder(): Promise<string | null>
   listBranches(repoPath: string): Promise<BranchList>
+  /** Use a local copy of the repository as the agent's workspace. */
+  linkRepo(sessionId: string, repoPath: string): Promise<void>
 }

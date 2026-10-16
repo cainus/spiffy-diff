@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { RotateCw, X } from 'lucide-react'
 import { BackendPicker } from '@/components/backend-picker'
 import { FilesView } from '@/components/files/files-view'
+import { LocalCopyButton } from '@/components/local-copy-button'
 import { SummaryView } from '@/components/summary/summary-view'
 import { Shimmer } from '@/components/ai-elements/shimmer'
 import {
@@ -94,6 +95,7 @@ export function Workspace() {
         </Breadcrumb>
         <div className="app-no-drag flex items-center gap-3">
           <ModeToggle mode={nav.mode} onChange={(mode) => nav$({ type: 'mode', mode })} />
+          <LocalCopyButton />
           <BackendPicker onChange={(b) => b !== store.backend && void store.resummarize(b)} />
           <Button
             size="icon-sm"

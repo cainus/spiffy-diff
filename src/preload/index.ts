@@ -53,6 +53,7 @@ const api: SpiffyBridge = {
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
   listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),
+  linkRepo: (sessionId, repoPath) => ipcRenderer.invoke('repo:link', sessionId, repoPath),
 }
 
 contextBridge.exposeInMainWorld('spiffy', api)
