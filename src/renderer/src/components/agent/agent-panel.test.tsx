@@ -152,6 +152,81 @@ describe('the agent panel', () => {
   })
 })
 
+describe('agent activity', () => {
+  function chatWith() {
+    let send: (c: unknown) => void = () => {}
+    let end: () => void = () => {}
+    bridge.chat = vi.fn((_req, h) => {
+      send = (c) => h.onChunk(c as never)
+      end = h.onEnd
+      return () => {}
+    })
+    return { send: (c: unknown) => act(() => send(c)), end: () => act(() => end()) }
+  }
+
+  async function ask() {
+    const user = await openPr()
+    ;(await screen.findByPlaceholderText('Ask a question…')).focus()
+    await user.keyboard('Why?')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await vi.waitFor(() => expect(bridge.chat).toHaveBeenCalled())
+    return user
+  }
+
+  const status = () => within(screen.getByRole('log')).queryByRole('status')
+
+  it('shows that the agent thinks after the stream starts and before any text', async () => {
+    const chat = chatWith()
+    await ask()
+
+    await chat.send({ type: 'start', messageId: 'a1' })
+    await chat.send({ type: 'start-step' })
+
+    expect(status()?.textContent).toContain('The agent thinks')
+  })
+
+  it('shows the tool that the agent uses, with a short path', async () => {
+    const chat = chatWith()
+    await ask()
+    await chat.send({ type: 'start', messageId: 'a1' })
+
+    await chat.send({
+      type: 'tool-input-available',
+      toolCallId: 't1',
+      toolName: 'Read',
+      input: { file_path: '/Users/me/.spiffy/worktrees/o__r-abc123/src/client.ts' },
+      dynamic: true,
+      providerExecuted: true,
+    })
+    expect(status()?.textContent).toContain('Reading src/client.ts')
+
+    await chat.send({
+      type: 'tool-input-available',
+      toolCallId: 't2',
+      toolName: 'Grep',
+      input: { pattern: 'withRetry' },
+      dynamic: true,
+      providerExecuted: true,
+    })
+    expect(status()?.textContent).toContain('Searching for withRetry')
+  })
+
+  it('hides the indicator while text streams, and after the answer ends', async () => {
+    const chat = chatWith()
+    await ask()
+    await chat.send({ type: 'start', messageId: 'a1' })
+    await chat.send({ type: 'text-start', id: 't' })
+    await chat.send({ type: 'text-delta', id: 't', delta: 'Because.' })
+
+    expect(status()).toBeNull()
+
+    await chat.send({ type: 'text-end', id: 't' })
+    await chat.send({ type: 'finish' })
+    await chat.end()
+    await vi.waitFor(() => expect(status()).toBeNull())
+  })
+})
+
 describe('drilling out from the agent box', () => {
   it('goes up one level with Escape while the agent box has the focus', async () => {
     const user = await openPr()

@@ -5,7 +5,7 @@ import { isNoise } from '@shared/noise'
 import type { SummaryProgress } from '@shared/progress'
 import type { LoadedSource } from '@shared/source'
 import { STE_RULES } from './style'
-import { describeTool } from './tool-activity'
+import { describeTool } from '@shared/tool-activity'
 import { buildSummary, modelSummarySchema, type ModelSummary, type Summary } from '@shared/summary'
 
 type PartialSummary = DeepPartial<ModelSummary>

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Crosshair, Sparkles } from 'lucide-react'
+import { Crosshair, Loader2, Sparkles } from 'lucide-react'
 import {
   Conversation,
   ConversationContent,
@@ -18,6 +18,7 @@ import {
   PromptInputTools,
 } from '@/components/ai-elements/prompt-input'
 import { Shimmer } from '@/components/ai-elements/shimmer'
+import { agentActivity } from '@/lib/agent-activity'
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion'
 import { ContextBox, IpcChatTransport } from '@/lib/ipc-transport'
 import { currentFocus, focusLabel } from '@/lib/nav'
@@ -50,6 +51,7 @@ export function AgentPanel() {
     transport,
   })
   const label = focusLabel(store.nav, store.summary)
+  const activity = agentActivity(messages, status)
 
   const ask = (text: string) => {
     if (text.trim()) void sendMessage({ text })
@@ -90,7 +92,33 @@ export function AgentPanel() {
               </motion.div>
             ))
           )}
-          {status === 'submitted' && <Shimmer className="text-sm">The agent thinks…</Shimmer>}
+          <AnimatePresence>
+            {activity && (
+              <motion.div
+                key="activity"
+                role="status"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={spring}
+                className="flex min-w-0 items-center gap-2"
+              >
+                <Loader2 className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={activity}
+                    initial={{ opacity: 0, x: 6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="min-w-0 truncate"
+                  >
+                    <Shimmer className="text-sm">{activity}</Shimmer>
+                  </motion.span>
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
           {error && <p className="text-destructive text-sm">{error.message}</p>}
         </ConversationContent>
         <ConversationScrollButton />

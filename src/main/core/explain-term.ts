@@ -1,7 +1,7 @@
 import { streamText, type LanguageModel } from 'ai'
 import type { TermEvent } from '@shared/terms'
 import { STE_RULES } from './style'
-import { describeTool } from './tool-activity'
+import { describeTool } from '@shared/tool-activity'
 
 export interface ExplainTermRequest {
   model: LanguageModel
