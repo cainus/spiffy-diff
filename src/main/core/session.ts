@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DeepPartial } from 'ai'
-import type { LoadRequest, LoadResult, SummaryStep } from '@shared/ipc'
+import type { LoadRequest, LoadResult } from '@shared/ipc'
+import type { SummaryProgress } from '@shared/progress'
 import { parsePrUrl, summaryCacheKey, type Backend, type LoadedSource } from '@shared/source'
 import type { ModelSummary, Summary } from '@shared/summary'
 import { readCachedSummary, writeCachedSummary } from './cache'
@@ -25,7 +26,7 @@ export interface SessionDeps {
     cwd: string,
     backend: Backend,
     onPartial: (p: DeepPartial<ModelSummary>) => void,
-    onStep?: (step: SummaryStep) => void,
+    onProgress?: (progress: SummaryProgress) => void,
   ) => Promise<Summary>
 }
 
@@ -80,7 +81,7 @@ export class Sessions {
     sessionId: string,
     backend: Backend,
     onPartial: (p: DeepPartial<ModelSummary>) => void,
-    onStep?: (step: SummaryStep) => void,
+    onProgress?: (progress: SummaryProgress) => void,
   ): Promise<Summary> {
     const session = this.get(sessionId)
     const { source } = session
@@ -91,7 +92,7 @@ export class Sessions {
       return cached
     }
     const cwd = await this.workspace(sessionId)
-    const summary = await this.deps.summarize(source, cwd, backend, onPartial, onStep)
+    const summary = await this.deps.summarize(source, cwd, backend, onPartial, onProgress)
     await writeCachedSummary(this.deps.home, key, summary)
     session.summary = summary
     return summary

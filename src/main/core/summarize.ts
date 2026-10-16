@@ -2,6 +2,7 @@ import { generateText, Output, streamText, type DeepPartial, type LanguageModel 
 import { z } from 'zod'
 import type { DiffFile } from '@shared/diff'
 import { isNoise } from '@shared/noise'
+import type { SummaryProgress } from '@shared/progress'
 import type { LoadedSource } from '@shared/source'
 import { STE_RULES } from './style'
 import { buildSummary, modelSummarySchema, type ModelSummary, type Summary } from '@shared/summary'
@@ -17,7 +18,7 @@ export interface SummarizeOptions {
   onPartial?: (partial: PartialSummary) => void
   /** Read the code with tools first, to find why it changed. */
   investigate?: boolean
-  onStep?: (step: 'investigating' | 'summarizing') => void
+  onProgress?: (progress: SummaryProgress) => void
   abortSignal?: AbortSignal
 }
 
@@ -42,6 +43,10 @@ ${STE_RULES}`
 
 function reviewable(files: DiffFile[]): DiffFile[] {
   return files.filter((f) => !isNoise(f.path))
+}
+
+function readableFiles(files: DiffFile[]): DiffFile[] {
+  return reviewable(files).filter((f) => !f.binary && f.hunks.length > 0)
 }
 
 function fileHeader(f: DiffFile): string {
@@ -100,8 +105,12 @@ interface Digest {
 }
 
 async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promise<Digest> {
-  const files = reviewable(source.files).filter((f) => !f.binary && f.hunks.length > 0)
+  const files = readableFiles(source.files)
   const notes: Record<string, string> = {}
+  let done = 0
+  const report = (file?: string): void =>
+    opts.onProgress?.({ plan: 'map-reduce', phase: 'digesting', done, total: files.length, file })
+  report()
   const digests = await mapLimit(files, opts.concurrency ?? 4, async (f) => {
     const { output } = await generateText({
       model: opts.model,
@@ -111,6 +120,8 @@ async function digestFiles(source: LoadedSource, opts: SummarizeOptions): Promis
       prompt: `${sourceIntro(source)}\n\nSummarize the edits in one file. Describe each hunk in one sentence.\n\n${promptHunks([f])}`,
     })
     for (const h of output.hunks) notes[h.id] = h.what
+    done++
+    report(f.path)
     const hunks = output.hunks.map((h) => `  [${h.id}] ${h.what}`).join('\n')
     return `${fileHeader(f)}: ${output.summary}\n${hunks}`
   })
@@ -127,16 +138,8 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
 
   let findings = ''
   if (opts.investigate) {
-    opts.onStep?.('investigating')
-    const { text } = await generateText({
-      model: opts.model,
-      system: INVESTIGATE,
-      abortSignal: opts.abortSignal,
-      prompt: `${sourceIntro(source)}\n\n${body}`,
-    })
-    findings = `Findings from reading the code:\n${text.trim()}\n\n`
+    findings = `Findings from reading the code:\n${(await investigate(source, body, plan, opts)).trim()}\n\n`
   }
-  opts.onStep?.('summarizing')
 
   const result = streamText({
     model: opts.model,
@@ -145,8 +148,16 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
     abortSignal: opts.abortSignal,
     prompt: `${sourceIntro(source)}\n\n${findings}${body}`,
   })
+  const hunkIds = new Set(readableFiles(source.files).flatMap((f) => f.hunks.map((h) => h.id)))
+  let placed = 0
+  const report = (done: number): void =>
+    opts.onProgress?.({ plan, phase: 'summarizing', done, total: hunkIds.size })
+  report(0)
   for await (const partial of result.partialOutputStream) {
-    if (isWellFormed(partial)) opts.onPartial?.(partial)
+    if (!isWellFormed(partial)) continue
+    opts.onPartial?.(partial)
+    const now = countPlaced(partial, hunkIds)
+    if (now > placed) report((placed = now))
   }
   const summary = buildSummary(await finalObject(result), source.files)
   // In map-reduce, the hunk descriptions of the file pass fill the notes that the model left out.
@@ -158,7 +169,50 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
     },
     source.files,
   ).hunkNotes
+  // The coverage check puts every hunk in a change, so all hunks are placed now.
+  report(hunkIds.size)
   return { ...summary, hunkNotes: { ...fromDigest, ...summary.hunkNotes } }
+}
+
+function countPlaced(partial: PartialSummary, hunkIds: Set<string>): number {
+  const placed = new Set<string>()
+  for (const g of partial.goals ?? []) {
+    for (const c of g?.changes ?? []) {
+      for (const id of c?.hunkIds ?? []) if (id && hunkIds.has(id)) placed.add(id)
+    }
+  }
+  return placed.size
+}
+
+/** The investigation pass. It reports each changed file that the agent opens with a tool. */
+async function investigate(
+  source: LoadedSource,
+  body: string,
+  plan: SummaryProgress['plan'],
+  opts: SummarizeOptions,
+): Promise<string> {
+  const paths = readableFiles(source.files).map((f) => f.path)
+  const read = new Set<string>()
+  const report = (file?: string): void =>
+    opts.onProgress?.({ plan, phase: 'reading', done: read.size, total: paths.length, file })
+  report()
+  const result = streamText({
+    model: opts.model,
+    system: INVESTIGATE,
+    abortSignal: opts.abortSignal,
+    prompt: `${sourceIntro(source)}\n\n${body}`,
+  })
+  for await (const part of result.fullStream) {
+    if (part.type !== 'tool-call') continue
+    const input = JSON.stringify(part.input)
+    for (const path of paths) {
+      if (!read.has(path) && input.includes(path)) {
+        read.add(path)
+        report(path)
+      }
+    }
+  }
+  return result.text
 }
 
 function isWellFormed(p: unknown): p is PartialSummary {

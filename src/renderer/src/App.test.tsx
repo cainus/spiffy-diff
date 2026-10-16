@@ -174,11 +174,11 @@ describe('hunk notes', () => {
   })
 })
 
-describe('the summary steps', () => {
-  it('says that the agent reads the code during the investigation step', async () => {
+describe('the summary progress', () => {
+  it('shows real progress while the agent reads the code', async () => {
     let finish: (s: Summary) => void = () => {}
-    window.spiffy.summarize = vi.fn((_id, _backend, _onPartial, onStep) => {
-      onStep?.('investigating')
+    window.spiffy.summarize = vi.fn((_id, _backend, _onPartial, onProgress) => {
+      onProgress?.({ plan: 'single', phase: 'reading', done: 1, total: 2, file: 'src/client.ts' })
       return new Promise<Summary>((r) => (finish = r))
     })
     const user = userEvent.setup()
@@ -186,9 +186,15 @@ describe('the summary steps', () => {
     await user.type(screen.getByPlaceholderText(/github.com/), 'https://github.com/o/r/pull/1')
     await user.click(screen.getByRole('button', { name: 'Explain' }))
 
-    expect(await screen.findByText('The agent reads the code to find why it changed…')).toBeTruthy()
+    expect(
+      await screen.findByText('The agent reads the code: 1 of 2 files (src/client.ts)'),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('progressbar', { name: 'Summary progress' }).getAttribute('aria-valuenow'),
+    ).toBe('35')
     finish(summary)
     expect(await screen.findByText('The change adds retry to the client.')).toBeTruthy()
+    await vi.waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
   })
 })
 

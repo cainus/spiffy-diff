@@ -5,7 +5,7 @@ import { BackendPicker } from '@/components/backend-picker'
 import { FilesView } from '@/components/files/files-view'
 import { LocalCopyButton } from '@/components/local-copy-button'
 import { SummaryView } from '@/components/summary/summary-view'
-import { Shimmer } from '@/components/ai-elements/shimmer'
+import { SummaryProgressBar } from '@/components/summary-progress'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -149,15 +149,7 @@ export function Workspace() {
             className="overflow-hidden border-b"
           >
             <div className="px-6 py-2 text-sm">
-              {error ? (
-                <span className="text-destructive">{error}</span>
-              ) : (
-                <Shimmer>
-                  {store.step === 'investigating'
-                    ? 'The agent reads the code to find why it changed…'
-                    : 'The agent makes the summary…'}
-                </Shimmer>
-              )}
+              {error ? <span className="text-destructive">{error}</span> : <SummaryProgressBar />}
             </div>
           </motion.div>
         )}

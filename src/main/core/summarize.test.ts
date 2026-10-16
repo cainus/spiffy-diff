@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { parseDiff } from '@shared/diff'
 import type { ModelSummary } from '@shared/summary'
 import type { LoadedSource } from '@shared/source'
+import type { SummaryProgress } from '@shared/progress'
 import { choosePlan, promptHunks, summarize } from './summarize'
 
 const usage = {
@@ -19,6 +20,41 @@ function streamJson(json: string) {
         { type: 'text-start' as const, id: 't' },
         ...parts.map((delta) => ({ type: 'text-delta' as const, id: 't', delta })),
         { type: 'text-end' as const, id: 't' },
+        {
+          type: 'finish' as const,
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          logprobs: undefined,
+          usage,
+        },
+      ],
+    }),
+  }
+}
+
+function investigationStream(paths: string[], text: string) {
+  return {
+    stream: simulateReadableStream({
+      chunks: [
+        ...paths.flatMap((path, i) => [
+          {
+            type: 'tool-call' as const,
+            toolCallId: `t${i}`,
+            toolName: 'Read',
+            input: JSON.stringify({ file_path: path }),
+            providerExecuted: true,
+            dynamic: true,
+          },
+          {
+            type: 'tool-result' as const,
+            toolCallId: `t${i}`,
+            toolName: 'Read',
+            result: 'file text',
+            dynamic: true,
+          },
+        ]),
+        { type: 'text-start' as const, id: 'n' },
+        { type: 'text-delta' as const, id: 'n', delta: text },
+        { type: 'text-end' as const, id: 'n' },
         {
           type: 'finish' as const,
           finishReason: { unified: 'stop' as const, raw: undefined },
@@ -163,41 +199,49 @@ describe('summarize', () => {
   })
 
   it('first reads the code to find why it changed, then builds the summary from those findings', async () => {
+    let call = 0
     const model = new MockLanguageModelV4({
-      doGenerate: async () => ({
-        content: [
-          {
-            type: 'text' as const,
-            text: 'FINDING: retry exists because the payment API drops calls.',
-          },
-        ],
-        finishReason: { unified: 'stop' as const, raw: undefined },
-        usage,
-        warnings: [],
-      }),
-      doStream: async () => streamJson(JSON.stringify(answer)),
+      doStream: async () =>
+        call++ === 0
+          ? investigationStream([], 'FINDING: retry exists because the payment API drops calls.')
+          : streamJson(JSON.stringify(answer)),
     })
 
     const summary = await summarize(source, { model, investigate: true })
 
-    const investigation = JSON.stringify(model.doGenerateCalls[0]!.prompt)
+    const investigation = JSON.stringify(model.doStreamCalls[0]!.prompt)
     expect(investigation).toContain('working directory')
     expect(investigation).toContain('[h2] src/client.ts')
-    const structured = JSON.stringify(model.doStreamCalls[0]!.prompt)
+    const structured = JSON.stringify(model.doStreamCalls[1]!.prompt)
     expect(structured).toContain('FINDING: retry exists because the payment API drops calls.')
     expect(summary.goals[0]!.title).toBe('Retry failed calls')
   })
 
-  it('reports the investigation step before the summary streams', async () => {
+  it('reports real progress: the changed files that the agent reads, then the hunks that get a change', async () => {
+    let call = 0
     const model = new MockLanguageModelV4({
-      doGenerate: async () => generateJson('notes'),
-      doStream: async () => streamJson(JSON.stringify(answer)),
+      doStream: async () =>
+        call++ === 0
+          ? investigationStream(
+              ['/ws/src/client.ts', '/ws/src/client.ts', '/ws/README.md', '/ws/src/retry.ts'],
+              'notes',
+            )
+          : streamJson(JSON.stringify(answer)),
     })
-    const steps: string[] = []
+    const events: SummaryProgress[] = []
 
-    await summarize(source, { model, investigate: true, onStep: (s) => steps.push(s) })
+    await summarize(source, { model, investigate: true, onProgress: (p) => events.push(p) })
 
-    expect(steps).toEqual(['investigating', 'summarizing'])
+    const reading = events.filter((e) => e.phase === 'reading')
+    expect(reading.map((e) => [e.done, e.total, e.file])).toEqual([
+      [0, 2, undefined],
+      [1, 2, 'src/client.ts'],
+      [2, 2, 'src/retry.ts'],
+    ])
+    const summarizing = events.filter((e) => e.phase === 'summarizing')
+    expect(summarizing.at(-1)).toMatchObject({ done: 2, total: 2 })
+    expect(summarizing.every((e, i) => i === 0 || e.done >= summarizing[i - 1]!.done)).toBe(true)
+    expect(events.every((e) => e.plan === 'single')).toBe(true)
   })
 
   it('asks the model for one note for each hunk', async () => {
@@ -241,7 +285,18 @@ describe('summarize', () => {
       doStream: async () => streamJson(JSON.stringify(answer)),
     })
 
-    const summary = await summarize(source, { model, tokenBudget: 10 })
+    const events: SummaryProgress[] = []
+    const summary = await summarize(source, {
+      model,
+      tokenBudget: 10,
+      onProgress: (p) => events.push(p),
+    })
+
+    expect(events.filter((e) => e.phase === 'digesting').map((e) => [e.done, e.total])).toEqual([
+      [0, 2],
+      [1, 2],
+      [2, 2],
+    ])
 
     expect(model.doGenerateCalls).toHaveLength(2)
     const reducePrompt = JSON.stringify(model.doStreamCalls[0]!.prompt)

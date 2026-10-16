@@ -28,11 +28,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       }),
     ensureWorkspace,
     repoName,
-    summarize: async (source, cwd, backend, onPartial, onStep) =>
+    summarize: async (source, cwd, backend, onPartial, onProgress) =>
       summarize(source, {
         model: await createModel(backend, cwd),
         onPartial,
-        onStep,
+        onProgress,
         investigate: true,
       }),
   })
@@ -44,7 +44,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       sessionId,
       backend,
       (partial) => e.sender.send('summary:partial', reqId, partial),
-      (step) => e.sender.send('summary:step', reqId, step),
+      (progress) => e.sender.send('summary:progress', reqId, progress),
     ),
   )
 

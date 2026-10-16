@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
 import type { DeepPartial } from 'ai'
-import type { LoadRequest, SummaryStep } from '@shared/ipc'
+import type { LoadRequest } from '@shared/ipc'
+import type { SummaryProgress } from '@shared/progress'
 import type { Backend, LoadedSource } from '@shared/source'
 import { hunkOwners, type ModelSummary, type Summary } from '@shared/summary'
 import { initialNav, navReducer, type NavAction, type NavState } from '@/lib/nav'
@@ -16,7 +17,7 @@ export interface AppState {
   source: LoadedSource | null
   summary: Summary | null
   partial: DeepPartial<ModelSummary> | null
-  step: SummaryStep | null
+  progress: SummaryProgress | null
   backend: Backend
   nav: NavState
 }
@@ -26,7 +27,7 @@ type Action =
   | { type: 'loaded'; sessionId: string; source: LoadedSource }
   | { type: 'summarizing' }
   | { type: 'partial'; partial: DeepPartial<ModelSummary> }
-  | { type: 'step'; step: SummaryStep }
+  | { type: 'progress'; progress: SummaryProgress }
   | { type: 'summary'; summary: Summary }
   | { type: 'error'; error: string }
   | { type: 'backend'; backend: Backend }
@@ -40,7 +41,7 @@ const initial: AppState = {
   source: null,
   summary: null,
   partial: null,
-  step: null,
+  progress: null,
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
 }
@@ -57,12 +58,12 @@ function reducer(state: AppState, action: Action): AppState {
         status: 'summarizing',
         summary: null,
         partial: null,
-        step: null,
+        progress: null,
         error: null,
         nav: initialNav,
       }
-    case 'step':
-      return { ...state, step: action.step }
+    case 'progress':
+      return { ...state, progress: action.progress }
     case 'partial':
       return { ...state, partial: action.partial }
     case 'summary':
@@ -92,7 +93,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         sessionId,
         backend,
         (partial) => dispatch({ type: 'partial', partial }),
-        (step) => dispatch({ type: 'step', step }),
+        (progress) => dispatch({ type: 'progress', progress }),
       )
       dispatch({ type: 'summary', summary })
     } catch (e) {

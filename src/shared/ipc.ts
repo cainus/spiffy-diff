@@ -1,5 +1,6 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 import type { Focus } from './focus'
+import type { SummaryProgress } from './progress'
 import type { Backend, LoadedSource } from './source'
 import type { ModelSummary, Summary } from './summary'
 import type { DeepPartial } from 'ai'
@@ -26,8 +27,6 @@ export interface StreamHandlers<T> {
   onError: (message: string) => void
 }
 
-export type SummaryStep = 'investigating' | 'summarizing'
-
 export interface BranchList {
   current: string
   branches: string[]
@@ -40,7 +39,7 @@ export interface SpiffyBridge {
     sessionId: string,
     backend: Backend,
     onPartial: (partial: DeepPartial<ModelSummary>) => void,
-    onStep?: (step: SummaryStep) => void,
+    onProgress?: (progress: SummaryProgress) => void,
   ): Promise<Summary>
   chat(req: ChatTurnRequest, handlers: StreamHandlers<UIMessageChunk>): () => void
   pickRepoFolder(): Promise<string | null>
