@@ -1,9 +1,14 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
+import { copyOldProfile } from './core/migrate'
 import { registerIpc } from './ipc'
 import { applyLoginShellPath } from './shell-path'
 
 applyLoginShellPath()
+
+// The app was called "spiffy". Keep its profile. This must run before the app is ready.
+app.setName('spiffy-diff')
+copyOldProfile(join(app.getPath('appData'), 'spiffy'), app.getPath('userData'))
 
 let mainWindow: BrowserWindow | null = null
 

@@ -116,7 +116,7 @@ export function FilesView() {
                   </div>
                   {selected.binary && (
                     <p className="text-muted-foreground text-sm">
-                      This is a binary file. Spiffy does not show its diff.
+                      This is a binary file. spiffy-diff does not show its diff.
                     </p>
                   )}
                   {selected.hunks.map((h, i) => (

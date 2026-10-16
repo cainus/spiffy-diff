@@ -1,6 +1,6 @@
-# Spiffy
+# spiffy-diff
 
-Spiffy is a desktop app. It explains a GitHub pull request or a local branch from the top down:
+spiffy-diff is a desktop app. It explains a GitHub pull request or a local branch from the top down:
 
 1. **Goals**: the main purposes of the changes.
 2. **Changes**: the related sets of code edits for each goal.
@@ -16,12 +16,12 @@ Words in this project have the meanings in [CONTEXT.md](CONTEXT.md). Decisions a
 ## Requirements
 
 - macOS, Node.js 22 or later, git.
-- The `gh` CLI, logged in (`gh auth login`). Spiffy reads pull requests with it.
+- The `gh` CLI, logged in (`gh auth login`). spiffy-diff reads pull requests with it.
 - One or both agent programs, logged in:
-  - Claude Code: `claude` (run `claude` one time to log in). Spiffy requires it. It does not include its own copy.
+  - Claude Code: `claude` (run `claude` one time to log in). spiffy-diff requires it. It does not include its own copy.
   - Codex: `codex` (run `codex login`).
 
-Spiffy uses the programs in your login shell PATH. It does not ask for API keys.
+spiffy-diff uses the programs in your login shell PATH. It does not ask for API keys.
 
 ## Start
 
@@ -36,7 +36,7 @@ npm 11 runs install scripts only for approved packages. `package.json` approves 
 
 ```sh
 npm run dist
-open release/mac-arm64/Spiffy.app
+open release/mac-arm64/spiffy-diff.app
 ```
 
 The app is not signed.
@@ -49,8 +49,9 @@ The app is not signed.
 - Click a goal to drill in. Click a change to see its code.
 - **ELI5** beside an explanation asks the agent to explain it again as for a child. Click it again to hide it.
 - Select any text in an explanation, a hunk note, or a popup, then press Explain. A popup shows the answer and what the agent reads while it works. Select text in a popup (or click an underlined phrase in it) to open another popup on top, to any depth. Escape closes the top popup; a click in a lower popup closes the popups above it. ↻ explains again.
-- Explained phrases are saved per repository in `~/.spiffy/explanations/`. They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
-- At start, Spiffy opens the last source at the place where you left it. Press Change PR in the top bar to open a different PR or branch.
+- Explained phrases are saved per repository in `~/.spiffy/explanations/` (the data folder keeps its old name, because git worktrees in it use absolute paths). They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
+- Keys: ↑/↓ move the highlight (or go to the last/next change or file), → or Enter drills in, ← or Escape drills out.
+- At start, spiffy-diff opens the last source at the place where you left it. Press Change PR in the top bar to open a different PR or branch.
   - dotted blue: technical jargon
   - green, monospace: internal code concepts
   - wavy amber: internal business concepts
@@ -61,7 +62,7 @@ The app is not signed.
 
 ## Data
 
-Spiffy keeps its data in `~/.spiffy`:
+spiffy-diff keeps its data in `~/.spiffy`:
 
 | Path         | Content                                                                    |
 | ------------ | -------------------------------------------------------------------------- |

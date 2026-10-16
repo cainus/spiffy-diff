@@ -85,7 +85,7 @@ export function Workspace() {
         <header className="flex h-12 shrink-0 items-center gap-3 border-b pr-3">
           <div className="app-drag w-20 self-stretch" />
           <motion.span layoutId="brand" className="text-sm font-semibold tracking-tight">
-            spiffy
+            spiffy-diff
           </motion.span>
           <AnimatePresence initial={false}>
             {canGoBack && (

@@ -8,7 +8,7 @@ import { useStore } from '@/state/use-store'
 
 /**
  * For a PR source, select a local copy of the repository. The agent then reads
- * that copy instead of a clone. Spiffy remembers it for later PRs. See PLAN.md decision 6.
+ * that copy instead of a clone. spiffy-diff remembers it for later PRs. See PLAN.md decision 6.
  */
 export function LocalCopyButton() {
   const { sessionId, source } = useStore()

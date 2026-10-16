@@ -1,5 +1,6 @@
 {
-  "name": "spiffy",
+  "name": "spiffy-diff",
+  "productName": "spiffy-diff",
   "version": "0.1.0",
   "private": true,
   "description": "Top-down explanations of pull requests and branches.",

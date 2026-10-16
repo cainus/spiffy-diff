@@ -1,11 +1,11 @@
-appId: com.cainus.spiffy
-productName: Spiffy
+appId: com.cainus.spiffy-diff
+productName: spiffy-diff
 directories:
   output: release
 files:
   - out/**
   - package.json
-  # Spiffy runs the Claude Code that the user installed. It does not ship the SDK's bundled binary (about 220 MB).
+  # spiffy-diff runs the Claude Code that the user installed. It does not ship the SDK's bundled binary (about 220 MB).
   - '!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**'
 mac:
   target: dir

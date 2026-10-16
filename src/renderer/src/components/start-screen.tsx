@@ -48,10 +48,10 @@ export function StartScreen() {
             layoutId="brand"
             className="bg-gradient-to-br from-white to-white/50 bg-clip-text text-6xl font-semibold tracking-tight text-transparent"
           >
-            spiffy
+            spiffy-diff
           </motion.h1>
           <p className="text-muted-foreground">
-            Spiffy explains a pull request or a branch from the top down.
+            spiffy-diff explains a pull request or a branch from the top down.
           </p>
         </div>
 

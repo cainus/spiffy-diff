@@ -387,7 +387,7 @@ describe('the local copy', () => {
     expect(await screen.findByTitle('Local copy: /code/r')).toBeTruthy()
   })
 
-  it('shows why spiffy refuses a folder', async () => {
+  it('shows why spiffy-diff refuses a folder', async () => {
     window.spiffy.pickRepoFolder = vi.fn(async () => '/code/x')
     window.spiffy.linkRepo = vi.fn(async () => {
       throw new Error(

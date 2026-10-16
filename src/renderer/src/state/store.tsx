@@ -28,7 +28,7 @@ export interface AppState {
   progress: SummaryProgress | null
   /** The number of the latest summary run. */
   runId: number
-  /** The request of the open source. Spiffy saves it to open the source again at the next start. */
+  /** The request of the open source. spiffy-diff saves it to open the source again at the next start. */
   request: LoadRequest | null
   /** A saved position to restore when the summary arrives. */
   resumeNav: NavState | null

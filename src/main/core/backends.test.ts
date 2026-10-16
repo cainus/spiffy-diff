@@ -97,7 +97,7 @@ describe('claudeExecutable', () => {
 
   it('tells you to install Claude Code when it is not on the PATH', () => {
     expect(() => claudeExecutable('/nonexistent')).toThrow(
-      'Spiffy cannot find Claude Code. Install it from https://claude.com/claude-code, then run `claude` one time to log in.',
+      'spiffy-diff cannot find Claude Code. Install it from https://claude.com/claude-code, then run `claude` one time to log in.',
     )
   })
 })

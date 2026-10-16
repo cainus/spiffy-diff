@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<Props, { error: Error | null }> {
     if (!this.state.error) return this.props.children
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-        <h1 className="text-lg font-semibold">Spiffy cannot show this view.</h1>
+        <h1 className="text-lg font-semibold">spiffy-diff cannot show this view.</h1>
         <pre className="text-muted-foreground max-w-2xl text-xs whitespace-pre-wrap">
           {this.state.error.message}
         </pre>

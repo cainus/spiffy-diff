@@ -70,12 +70,12 @@ export function pickCodexModel(models: CodexModelInfo[]): string {
   return chosen.id
 }
 
-/** The installed Claude Code program. Spiffy does not ship its own copy. */
+/** The installed Claude Code program. spiffy-diff does not ship its own copy. */
 export function claudeExecutable(path = process.env['PATH'] ?? ''): string {
   const found = findOnPath('claude', path)
   if (!found) {
     throw new Error(
-      'Spiffy cannot find Claude Code. Install it from https://claude.com/claude-code, then run `claude` one time to log in.',
+      'spiffy-diff cannot find Claude Code. Install it from https://claude.com/claude-code, then run `claude` one time to log in.',
     )
   }
   return found
