@@ -1,4 +1,5 @@
 import { CodeText } from '@/components/code-text'
+import { ChangeKindBadge } from './change-kind-badge'
 import type { ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
 import { HIGHLIGHT, useHighlight } from '@/lib/use-highlight'
@@ -51,7 +52,10 @@ export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk
                     <span className="text-muted-foreground mr-2 font-mono text-xs">{i + 1}</span>
                     <CodeText text={change.title} />
                   </h2>
-                  <ArrowRight className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                  <span className="flex shrink-0 items-center gap-2">
+                    <ChangeKindBadge kind={change.kind} />
+                    <ArrowRight className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                  </span>
                 </motion.div>
                 {change.description && (
                   <p className="text-muted-foreground text-sm">

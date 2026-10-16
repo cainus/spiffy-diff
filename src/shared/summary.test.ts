@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { DiffFile, Hunk } from './diff'
-import { buildSummary, hunkOwners, OTHER_GOAL_TITLE, NOISE_GOAL_TITLE } from './summary'
+import { zodSchema } from 'ai'
+import {
+  buildSummary,
+  hunkOwners,
+  modelSummarySchema,
+  OTHER_GOAL_TITLE,
+  NOISE_GOAL_TITLE,
+} from './summary'
 
 function hunk(id: string, path: string): Hunk {
   return {
@@ -32,6 +39,47 @@ const files = [
   file('src/b.ts', 'h3'),
   file('package-lock.json', 'h4'),
 ]
+
+describe('change kinds', () => {
+  it('keeps the kind of each change, and gives no kind to the changes that spiffy-diff makes', () => {
+    const summary = buildSummary(
+      {
+        overview: '',
+        goals: [
+          {
+            title: 'G',
+            description: '',
+            changes: [
+              { title: 'New', description: '', hunkIds: ['h1'], kind: 'feature' },
+              { title: 'Move', description: '', hunkIds: ['h2'], kind: 'refactor' },
+            ],
+          },
+        ],
+      },
+      files,
+    )
+
+    expect(summary.goals[0]!.changes.map((c) => c.kind)).toEqual(['feature', 'refactor'])
+    expect(summary.goals.find((g) => g.kind === 'other')!.changes[0]!.kind).toBeUndefined()
+  })
+
+  it('tells the model the three kinds, and requires a kind for each change', () => {
+    const json = JSON.stringify(zodSchema(modelSummarySchema).jsonSchema)
+    expect(json).toContain('"enum":["feature","internal","refactor"]')
+    type Node = {
+      properties: Record<string, Node>
+      items: Node
+      required: string[]
+      description?: string
+    }
+    const root = zodSchema(modelSummarySchema).jsonSchema as unknown as Node
+    const change = root.properties['goals']!.items.properties['changes']!.items
+    expect(change.required).toContain('kind')
+    expect(change.properties['kind']!.description).toMatch(
+      /new functionality.*internal.*refactor/is,
+    )
+  })
+})
 
 describe('buildSummary', () => {
   it('gives stable IDs to goals and changes and keeps the model text', () => {

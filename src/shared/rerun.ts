@@ -1,4 +1,4 @@
-import type { Summary } from './summary'
+import type { ChangeKind, Summary } from './summary'
 
 /** `detail` writes the notes of a change the first time it shows. `rerun` also writes its title and description. */
 export type RerunMode = 'detail' | 'rerun'
@@ -7,6 +7,7 @@ export interface RerunDone {
   type: 'done'
   title?: string
   description?: string
+  kind?: ChangeKind
   /** The margin note of each hunk: what it changes and why. */
   hunkNotes: Record<string, string>
   /** The hover note of each block: what the old or the new code does. */

@@ -65,12 +65,14 @@ const summary: Summary = {
           title: 'Wrap the call',
           description: 'The client calls retry.',
           hunkIds: ['h1'],
+          kind: 'feature',
         },
         {
           id: 'g1.c2',
           title: 'Add the retry helper',
           description: 'A new helper.',
           hunkIds: ['h2'],
+          kind: 'refactor',
         },
       ],
     },
@@ -464,6 +466,25 @@ describe('the files view', () => {
     )
 
     expect(await screen.findByRole('heading', { name: 'Wrap the call' })).toBeTruthy()
+  })
+})
+
+describe('change kinds', () => {
+  it('shows the kind of each change in the list and on the change page', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+
+    const wrap = await screen.findByRole('button', { name: /Wrap the call/ })
+    expect(within(wrap).getByText('New functionality')).toBeTruthy()
+    expect(
+      within(screen.getByRole('button', { name: /Add the retry helper/ })).getByText('Refactor'),
+    ).toBeTruthy()
+
+    await user.click(wrap)
+    const header = (
+      await screen.findByRole('heading', { level: 1, name: 'Wrap the call' })
+    ).closest('header')!
+    expect(within(header).getByText('New functionality')).toBeTruthy()
   })
 })
 

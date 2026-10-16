@@ -43,6 +43,7 @@ const INSTRUCTIONS = `You explain code changes to a reviewer from the top down.
 Find the main goals of the changes. A goal is one purpose, for example "Add retry to the payment client".
 Put the most important goal first. Use few goals: one to five for most changes.
 For each goal, list the changes. A change is one related set of code edits that serves the goal.
+Give each change a kind: "feature" (new functionality), "internal" (different behavior inside, for example performance, logging, metrics, or dependencies), or "refactor" (code moves, behavior stays the same).
 Attach hunks to changes with their hunk IDs, for example "h3". Use only hunk IDs that you see.
 Attach every hunk to at least one change.
 Use the findings from the code to write why each change exists, not only what it does.

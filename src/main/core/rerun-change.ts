@@ -4,7 +4,7 @@ import { hunkBlocks } from '@shared/blocks'
 import type { DiffFile } from '@shared/diff'
 import type { RerunDone, RerunEvent, RerunMode } from '@shared/rerun'
 import type { LoadedSource } from '@shared/source'
-import type { Summary } from '@shared/summary'
+import { CHANGE_KIND_TEXT, CHANGE_KINDS, type Summary } from '@shared/summary'
 import { describeTool } from '@shared/tool-activity'
 import { STE_RULES } from './style'
 
@@ -58,6 +58,7 @@ const detailSchema = z.object({
 const rerunSchema = z.object({
   title: z.string().describe('A short title for this set of code edits.'),
   description: z.string().describe('What this change does and why, in 1-3 sentences.'),
+  kind: z.enum(CHANGE_KINDS).describe(CHANGE_KIND_TEXT),
   hunks: detailSchema.shape.hunks,
 })
 
@@ -128,6 +129,7 @@ ${promptBlocks(files)}`
     })
     done.title = output.title.trim()
     done.description = output.description.trim()
+    done.kind = output.kind
     hunks = output.hunks
   } else {
     hunks = (await generateText({ ...options, output: Output.object({ schema: detailSchema }) }))

@@ -64,6 +64,7 @@ describe('rerunChange', () => {
         generateJson({
           title: 'Add a backoff',
           description: 'The retry waits between tries.',
+          kind: 'internal',
           hunks: [
             {
               hunkId: 'h1',
@@ -93,6 +94,7 @@ describe('rerunChange', () => {
         type: 'done',
         title: 'Add a backoff',
         description: 'The retry waits between tries.',
+        kind: 'internal',
         hunkNotes: { h1: 'Calls failed in bursts, so the retry must wait.' },
         blockNotes: { 'h1.b1': 'Sets the wait time to 2 seconds.' },
       },
@@ -199,6 +201,7 @@ describe('applyRerun', () => {
       type: 'done',
       title: 'New',
       description: 'New text.',
+      kind: 'refactor',
       hunkNotes: { h1: 'New note.' },
       blockNotes: { 'h1.b1': 'Block.' },
     })

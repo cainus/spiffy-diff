@@ -6,49 +6,64 @@ export const OTHER_GOAL_TITLE = 'Other changes'
 export const NOISE_GOAL_TITLE = 'Generated & lockfiles'
 
 /** The shape that the model returns. See ADR 0002. */
-export const modelSummarySchema = z.object({
-  overview: z.string().describe('Two or three sentences that explain the whole source.'),
-  goals: z
-    .array(
-      z.object({
-        title: z
-          .string()
-          .describe('A short imperative title, for example "Add retry to the payment client".'),
-        description: z
-          .string()
-          .describe('Why this goal exists and what it does, in 2-4 sentences.'),
-        changes: z.array(
-          z.object({
-            title: z.string().describe('A short title for one related set of code edits.'),
-            description: z.string().describe('What this change does and why, in 1-3 sentences.'),
-            hunkIds: z
-              .array(z.string())
-              .describe('The IDs of the hunks that implement this change.'),
-          }),
+export const CHANGE_KINDS = ['feature', 'internal', 'refactor'] as const
+export type ChangeKind = (typeof CHANGE_KINDS)[number]
+
+export const CHANGE_KIND_TEXT = `The kind of the change:
+- "feature": new functionality. The software can do something that it could not do before.
+- "internal": the behavior inside is different, but users get no new function. For example performance, logging, metrics, error handling, or new dependencies.
+- "refactor": no behavior changes. The code only moves or gets a different structure or names.`
+
+const changeKind = z.enum(CHANGE_KINDS).describe(CHANGE_KIND_TEXT)
+
+const strictChange = z.object({
+  title: z.string().describe('A short title for one related set of code edits.'),
+  description: z.string().describe('What this change does and why, in 1-3 sentences.'),
+  hunkIds: z.array(z.string()).describe('The IDs of the hunks that implement this change.'),
+  kind: changeKind,
+})
+const acceptedChange = strictChange.extend({ kind: changeKind.optional() })
+
+function goalSchema<C extends z.ZodType>(change: C) {
+  return z.object({
+    title: z
+      .string()
+      .describe('A short imperative title, for example "Add retry to the payment client".'),
+    description: z.string().describe('Why this goal exists and what it does, in 2-4 sentences.'),
+    changes: z.array(change),
+  })
+}
+
+const hunkNotesSchema = z
+  .array(
+    z.object({
+      hunkId: z.string(),
+      note: z
+        .string()
+        .describe(
+          'What this hunk changes and why that change is necessary, in one or two short sentences.',
         ),
-      }),
-    )
-    .describe('The main goals, most important first.'),
-  hunkNotes: z
-    .array(
-      z.object({
-        hunkId: z.string(),
-        note: z
-          .string()
-          .describe(
-            'What this hunk changes and why that change is necessary, in one or two short sentences.',
-          ),
-      }),
-    )
-    .describe('One note for each hunk. Write a note for every hunk ID in the diff.'),
+    }),
+  )
+  .describe('One note for each hunk. Write a note for every hunk ID in the diff.')
+
+const overviewSchema = z.string().describe('Two or three sentences that explain the whole source.')
+
+/** The schema that the model gets in a single-pass summary. Every part is required. */
+export const modelSummarySchema = z.object({
+  overview: overviewSchema,
+  goals: z.array(goalSchema(strictChange)).describe('The main goals, most important first.'),
+  hunkNotes: hunkNotesSchema,
 })
 
 /**
- * The schema to read the model answer. The model must send notes (see the schema above), but an
- * answer without notes is still a good summary: the note pass then writes the notes.
+ * The schema to read the model answer. The model must send notes and kinds, but an answer without
+ * them is still a good summary: the note pass then writes the notes.
  */
-export const acceptedSummarySchema = modelSummarySchema.extend({
-  hunkNotes: modelSummarySchema.shape.hunkNotes.optional(),
+export const acceptedSummarySchema = z.object({
+  overview: overviewSchema,
+  goals: z.array(goalSchema(acceptedChange)).describe('The main goals, most important first.'),
+  hunkNotes: hunkNotesSchema.optional(),
 })
 
 export type ModelSummary = z.infer<typeof acceptedSummarySchema>
@@ -58,6 +73,8 @@ export interface Change {
   title: string
   description: string
   hunkIds: string[]
+  /** Changes that spiffy-diff makes (other hunks, noise) have no kind. */
+  kind?: ChangeKind
 }
 
 type GoalKind = 'model' | 'other' | 'noise'
@@ -116,7 +133,12 @@ export function buildSummary(model: ModelSummary, files: DiffFile[]): Summary {
       .map((c) => {
         const hunkIds = c.hunkIds.filter((id) => reviewable.has(id))
         hunkIds.forEach((id) => covered.add(id))
-        return { title: c.title, description: c.description, hunkIds }
+        return {
+          title: c.title,
+          description: c.description,
+          hunkIds,
+          ...(c.kind ? { kind: c.kind } : {}),
+        }
       })
       .filter((c) => c.hunkIds.length > 0),
   }))

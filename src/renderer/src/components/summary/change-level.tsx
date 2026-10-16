@@ -14,6 +14,7 @@ import { itemVariants, spring } from '@/lib/motion'
 import { groupByFile, lineStats } from '@/lib/stats'
 import { useStore } from '@/state/use-store'
 import { Explained } from '@/components/explained'
+import { ChangeKindBadge } from './change-kind-badge'
 import { LineStats } from './line-stats'
 
 export function ChangeLevel({
@@ -49,9 +50,12 @@ export function ChangeLevel({
           >
             {goal.title}
           </motion.div>
-          <motion.h1 layout="position" className="text-xl font-semibold tracking-tight">
-            <CodeText text={change.title} />
-          </motion.h1>
+          <motion.div layout="position" className="flex items-start justify-between gap-3">
+            <h1 className="text-xl font-semibold tracking-tight">
+              <CodeText text={change.title} />
+            </h1>
+            <ChangeKindBadge kind={change.kind} />
+          </motion.div>
           {change.description && <Explained title={change.title} text={change.description} />}
           <LineStats stats={lineStats(change.hunkIds, index)} />
         </motion.header>
