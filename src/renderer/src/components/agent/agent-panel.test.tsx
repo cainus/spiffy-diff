@@ -11,7 +11,16 @@ import { App } from '@/App'
 
 // The diff renderer draws into Shadow DOM. The tests check which patch it gets.
 vi.mock('@pierre/diffs/react', () => ({
-  PatchDiff: ({ patch }: { patch: string }) => <pre data-testid="patch">{patch}</pre>,
+  PatchDiff: ({ patch, options }: { patch: string; options?: unknown }) => (
+    <pre
+      data-testid="patch"
+      ref={(el) => {
+        if (el) (el as unknown as { options: unknown }).options = options
+      }}
+    >
+      {patch}
+    </pre>
+  ),
 }))
 
 const source: LoadedSource = {
@@ -487,6 +496,103 @@ describe('explaining a selection', () => {
     await vi.waitFor(() => expect(popup.textContent).toContain('Second answer.'))
     expect(popup.textContent).not.toContain('First answer.')
     expect(bridge.explainTerm).toHaveBeenCalledTimes(2)
+  })
+
+  describe('in a change', () => {
+    const explained: Summary = {
+      ...summary,
+      detailed: ['g1.c1'],
+      hunkNotes: { h1: 'Calls fail in bursts, so the client wraps them in a retry loop.' },
+      blockNotes: { 'h1.b2': 'Calls the API through the retry helper with backoff.' },
+    }
+    type Hover = {
+      annotationSide: string
+      lineNumber: number
+      lineType: string
+      lineElement: HTMLElement
+    }
+    const line: Hover = {
+      annotationSide: 'additions',
+      lineNumber: 10,
+      lineType: 'change-addition',
+      lineElement: document.body,
+    }
+
+    async function openChange() {
+      bridge.summarize = vi.fn(async () => explained)
+      const user = await openPr()
+      await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+      await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+      await screen.findByRole('heading', { level: 1, name: 'Wrap the call' })
+      return user
+    }
+
+    async function hover() {
+      const el = await screen.findByTestId('patch')
+      const options = (
+        el as unknown as {
+          options: { onLineEnter: (p: Hover) => void; onLineLeave: (p: Hover) => void }
+        }
+      ).options
+      act(() => options.onLineEnter(line))
+      return { options, tip: await screen.findByRole('tooltip') }
+    }
+
+    it('explains text that you select in a margin note', async () => {
+      explainWith({ 'retry loop': [{ type: 'text', delta: 'A loop that runs a call again.' }] })
+      const user = await openChange()
+      const margin = (await screen.findByText(/retry loop/)).closest('aside')!
+
+      select(margin, 'retry loop')
+      await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+
+      expect(await screen.findByRole('dialog', { name: 'retry loop' })).toBeTruthy()
+      expect(bridge.explainTerm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phrase: 'retry loop',
+          context: 'Calls fail in bursts, so the client wraps them in a retry loop.',
+        }),
+        expect.anything(),
+      )
+    })
+
+    it('keeps the code popover open while the pointer is on it, and explains text that you select in it', async () => {
+      explainWith({ backoff: [{ type: 'text', delta: 'Backoff waits longer each time.' }] })
+      const user = await openChange()
+      const { options, tip } = await hover()
+
+      fireEvent.pointerEnter(tip)
+      act(() => options.onLineLeave(line))
+      await new Promise((r) => setTimeout(r, 400))
+      expect(screen.getByRole('tooltip')).toBe(tip)
+
+      select(tip, 'backoff')
+      fireEvent.pointerLeave(tip)
+      // The pointer takes a moment to reach the Explain button. The popover and the selection stay.
+      await new Promise((r) => setTimeout(r, 400))
+      expect(screen.getByRole('tooltip')).toBe(tip)
+      await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+
+      expect(await screen.findByRole('dialog', { name: 'backoff' })).toBeTruthy()
+      expect(bridge.explainTerm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phrase: 'backoff',
+          context: 'Calls the API through the retry helper with backoff.',
+        }),
+        expect.anything(),
+      )
+    })
+
+    it('closes the code popover when the pointer leaves it and nothing in it is selected', async () => {
+      await openChange()
+      const { options, tip } = await hover()
+      fireEvent.pointerEnter(tip)
+      act(() => options.onLineLeave(line))
+
+      fireEvent.pointerLeave(tip)
+
+      await vi.waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull())
+    })
   })
 })
 

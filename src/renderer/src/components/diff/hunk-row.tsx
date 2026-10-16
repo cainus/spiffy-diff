@@ -19,8 +19,8 @@ interface HunkRowProps {
   pending?: boolean
 }
 
-/** A pointer move to the next line of the same block must not close the popover. */
-const HIDE_DELAY_MS = 120
+/** Time to move the pointer to the next line, or onto the popover, before the popover closes. */
+const HIDE_DELAY_MS = 200
 
 /**
  * One hunk: the diff on the left, and in the margin a note that tells what the hunk changes and why.
@@ -34,13 +34,37 @@ export function HunkRow({ file, hunkId, delay, header, pending = false }: HunkRo
   const blocks = useMemo(() => (hunk ? hunkBlocks(hunk) : []), [hunk])
   const [hover, setHover] = useState<{ block: Block; rect: DOMRect } | null>(null)
   const hide = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  // The pointer is on the popover. The popover then stays, so that you can select its text.
+  const onPopover = useRef(false)
   useEffect(() => () => clearTimeout(hide.current ?? undefined), [])
 
-  const onLineHover = (line: LineHover | null): void => {
+  const hasSelection = (): boolean => {
+    const sel = window.getSelection()
+    return !!sel && !sel.isCollapsed && !!popoverRef.current?.contains(sel.anchorNode)
+  }
+  // Close the popover, but not while the pointer is on it or while you have a selection in it.
+  const hideLater = (): void => {
     clearTimeout(hide.current ?? undefined)
+    hide.current = setTimeout(() => {
+      if (onPopover.current) return
+      if (!hasSelection()) return setHover(null)
+      const retry = (): void => {
+        if (hasSelection()) return
+        document.removeEventListener('selectionchange', retry)
+        if (!onPopover.current) setHover(null)
+      }
+      document.addEventListener('selectionchange', retry)
+    }, HIDE_DELAY_MS)
+  }
+
+  const onLineHover = (line: LineHover | null): void => {
     const block = line ? blockAt(blocks, line.side, line.lineNumber) : null
-    if (line && block) setHover({ block, rect: line.element.getBoundingClientRect() })
-    else hide.current = setTimeout(() => setHover(null), HIDE_DELAY_MS)
+    if (line && block) {
+      clearTimeout(hide.current ?? undefined)
+      // A popover with a selection keeps its block.
+      if (!hasSelection()) setHover({ block, rect: line.element.getBoundingClientRect() })
+    } else hideLater()
   }
 
   return (
@@ -79,6 +103,15 @@ export function HunkRow({ file, hunkId, delay, header, pending = false }: HunkRo
           text={summary?.blockNotes?.[hover.block.id]}
           pending={pending}
           rect={hover.rect}
+          popoverRef={popoverRef}
+          onPointerEnter={() => {
+            onPopover.current = true
+            clearTimeout(hide.current ?? undefined)
+          }}
+          onPointerLeave={() => {
+            onPopover.current = false
+            hideLater()
+          }}
         />
       )}
     </section>

@@ -145,7 +145,8 @@
   code,
   h1,
   h2,
-  [data-selectable] {
+  [data-selectable],
+  [data-explainable] {
     user-select: text;
   }
 }

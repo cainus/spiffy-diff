@@ -1,8 +1,9 @@
+import type { RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import type { Block } from '@shared/blocks'
 import { Shimmer } from '@/components/ai-elements/shimmer'
-import { CodeText } from '@/components/code-text'
+import { PhraseText } from '@/components/explain/phrase-text'
 import { cn } from '@/lib/utils'
 
 /**
@@ -14,16 +15,25 @@ export function BlockPopover({
   text,
   pending,
   rect,
+  popoverRef,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   block: Block
   text: string | undefined
   pending: boolean
   rect: DOMRect
+  popoverRef: RefObject<HTMLDivElement | null>
+  onPointerEnter: () => void
+  onPointerLeave: () => void
 }) {
   const before = block.kind === 'before'
   return createPortal(
     <motion.div
+      ref={popoverRef}
       role="tooltip"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       initial={{ opacity: 0, y: -4, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.12 }}
@@ -34,7 +44,7 @@ export function BlockPopover({
         zIndex: 60,
       }}
       className={cn(
-        'bg-popover text-popover-foreground pointer-events-none max-w-md rounded-lg border p-3 text-sm leading-relaxed shadow-lg',
+        'bg-popover text-popover-foreground max-w-md rounded-lg border p-3 text-sm leading-relaxed shadow-lg select-text',
         before ? 'border-l-4 border-l-red-500/70' : 'border-l-4 border-l-emerald-500/70',
       )}
     >
@@ -42,7 +52,8 @@ export function BlockPopover({
         {before ? 'BEFORE:' : 'NOW:'}
       </span>{' '}
       {text ? (
-        <CodeText text={text} />
+        // Select text here to explain it, as in the rest of the app.
+        <PhraseText text={text} />
       ) : pending ? (
         <Shimmer>The agent explains this code…</Shimmer>
       ) : (

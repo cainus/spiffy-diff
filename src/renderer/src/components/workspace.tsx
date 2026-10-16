@@ -87,7 +87,10 @@ export function Workspace() {
         {/* Only empty header space drags the window. Drag regions can take clicks from controls inside them. */}
         <header className="flex h-12 shrink-0 items-center gap-3 border-b pr-3">
           <div className="app-drag w-20 self-stretch" />
-          <motion.span layoutId="brand" className="text-sm font-semibold tracking-tight">
+          <motion.span
+            layoutId="brand"
+            className="shrink-0 text-sm font-semibold tracking-tight whitespace-nowrap"
+          >
             spiffy-diff
           </motion.span>
           <AnimatePresence initial={false}>
