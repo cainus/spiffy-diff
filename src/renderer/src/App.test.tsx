@@ -276,6 +276,44 @@ describe('opening a new source', () => {
   })
 })
 
+describe('arrow keys', () => {
+  it('moves through the goals and changes, drills in and out, and shows the highlight', async () => {
+    const user = await openPr()
+
+    await user.keyboard('{ArrowDown}')
+    expect(
+      screen.getByRole('button', { name: /Retry failed calls/ }).getAttribute('aria-current'),
+    ).toBe('true')
+
+    await user.keyboard('{ArrowRight}')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Retry failed calls' }),
+    ).toBeTruthy()
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Wrap the call' })).toBeTruthy()
+
+    await user.keyboard('{ArrowLeft}')
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /Wrap the call/ }).getAttribute('aria-current'),
+      ).toBe('true'),
+    )
+  })
+
+  it('does not move while you type in a text box', async () => {
+    const user = await openPr()
+    const box = document.body.appendChild(document.createElement('input'))
+    box.focus()
+
+    await user.keyboard('{ArrowDown}')
+    box.remove()
+
+    expect(
+      screen.getByRole('button', { name: /Retry failed calls/ }).getAttribute('aria-current'),
+    ).toBeNull()
+  })
+})
+
 describe('resuming', () => {
   it('opens the last source at the change where you left it', async () => {
     const user = await openPr()

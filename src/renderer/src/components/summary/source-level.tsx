@@ -8,12 +8,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { itemVariants, spring } from '@/lib/motion'
 import { lineStats } from '@/lib/stats'
 import { cn } from '@/lib/utils'
+import { HIGHLIGHT, useHighlight } from '@/lib/use-highlight'
 import { useStore } from '@/state/use-store'
 import { Explained } from '@/components/explained'
 import { LineStats } from './line-stats'
 
 export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
-  const { summary, partial, source, status, nav$ } = useStore()
+  const { summary, partial, source, status, nav, nav$ } = useStore()
   const all = lineStats([...index.keys()], index)
   const overview = summary?.overview ?? partial?.overview ?? ''
 
@@ -52,6 +53,7 @@ export function SourceLevel({ index }: { index: Map<string, Hunk> }) {
                   goal={goal}
                   rank={i + 1}
                   index={index}
+                  highlighted={nav.cursor === i}
                   onOpen={() => nav$({ type: 'drillIn', goalId: goal.id })}
                 />
               ))
@@ -81,13 +83,16 @@ function GoalCard({
   goal,
   rank,
   index,
+  highlighted,
   onOpen,
 }: {
   goal: Goal
   rank: number
   index: Map<string, Hunk>
+  highlighted: boolean
   onOpen: () => void
 }) {
+  const ref = useHighlight<HTMLButtonElement>(highlighted)
   const stats = lineStats(
     goal.changes.flatMap((c) => c.hunkIds),
     index,
@@ -95,6 +100,8 @@ function GoalCard({
   const Icon = goal.kind === 'model' ? Layers : Boxes
   return (
     <motion.button
+      ref={ref}
+      aria-current={highlighted || undefined}
       layoutId={`goal-${goal.id}`}
       variants={itemVariants}
       transition={spring}
@@ -105,6 +112,7 @@ function GoalCard({
         'group bg-card relative flex flex-col gap-3 overflow-hidden rounded-xl border p-5 text-left',
         'hover:border-primary/40 shadow-sm transition-colors hover:shadow-lg',
         goal.kind !== 'model' && 'bg-card/50 opacity-80',
+        highlighted && HIGHLIGHT,
       )}
     >
       <div className="from-primary/10 pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent opacity-0 transition-opacity group-hover:opacity-100" />

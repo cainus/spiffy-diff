@@ -1,3 +1,6 @@
+import type { ComponentProps } from 'react'
+import { cn } from '@/lib/utils'
+import { HIGHLIGHT, useHighlight } from '@/lib/use-highlight'
 import { motion } from 'motion/react'
 import { ArrowRight, FileCode } from 'lucide-react'
 import type { Hunk } from '@shared/diff'
@@ -10,7 +13,7 @@ import { Explained } from '@/components/explained'
 import { LineStats } from './line-stats'
 
 export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk> }) {
-  const { nav$ } = useStore()
+  const { nav, nav$ } = useStore()
   return (
     <ScrollArea className="h-full">
       <div className="mx-auto max-w-4xl space-y-6 px-8 py-8">
@@ -30,8 +33,9 @@ export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk
           {goal.changes.map((change, i) => {
             const paths = [...new Set(change.hunkIds.flatMap((id) => index.get(id)?.path ?? []))]
             return (
-              <motion.button
+              <ChangeItem
                 key={change.id}
+                highlighted={nav.cursor === i}
                 layoutId={`change-${change.id}`}
                 variants={itemVariants}
                 transition={spring}
@@ -66,11 +70,28 @@ export function GoalLevel({ goal, index }: { goal: Goal; index: Map<string, Hunk
                     <span className="text-muted-foreground text-xs">+{paths.length - 4} more</span>
                   )}
                 </div>
-              </motion.button>
+              </ChangeItem>
             )
           })}
         </div>
       </div>
     </ScrollArea>
+  )
+}
+
+/** A change in the list. It has the arrow-key highlight when `highlighted` is true. */
+function ChangeItem({
+  highlighted,
+  className,
+  ...props
+}: { highlighted: boolean } & ComponentProps<typeof motion.button>) {
+  const ref = useHighlight<HTMLButtonElement>(highlighted)
+  return (
+    <motion.button
+      ref={ref}
+      aria-current={highlighted || undefined}
+      className={cn(className, highlighted && HIGHLIGHT)}
+      {...props}
+    />
   )
 }

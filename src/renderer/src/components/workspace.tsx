@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowLeftRight, RotateCw } from 'lucide-react'
 import { BackendPicker } from '@/components/backend-picker'
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { arrowKey } from '@/lib/keys'
 import { breadcrumbs, type NavState } from '@/lib/nav'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,10 @@ function isTyping(target: EventTarget | null): boolean {
 export function Workspace() {
   const store = useStore()
   const { nav, nav$, summary, status, error } = store
+  const latest = useRef(store)
+  useLayoutEffect(() => {
+    latest.current = store
+  })
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -49,7 +54,19 @@ export function Workspace() {
       const escape = e.key === 'Escape' && !e.defaultPrevented
       const back = (e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft')
       const backspace = e.key === 'Backspace' && !typing
-      if (!escape && !back && !backspace) return
+      if (!escape && !back && !backspace) {
+        if (typing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+        if (document.querySelector('[data-explain-popup]')) return
+        // Enter on a focused button clicks it. Leave that to the button.
+        if (e.key === 'Enter' && e.target instanceof HTMLElement && e.target.closest('button, a'))
+          return
+        const files = latest.current.source?.files.map((f) => f.path) ?? []
+        const action = arrowKey(latest.current.nav, latest.current.summary, files, e.key)
+        if (!action) return
+        e.preventDefault()
+        nav$(action)
+        return
+      }
       e.preventDefault()
       if (typing && e.target instanceof HTMLElement) e.target.blur()
       nav$({ type: 'drillOut' })

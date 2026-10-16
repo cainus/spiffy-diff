@@ -9,11 +9,14 @@ export interface NavState {
   file: string | null
   /** 1 when you drill in, -1 when you drill out. The animations use it. */
   direction: 1 | -1
+  /** The highlighted item of the list on the screen, for the arrow keys. Null shows no highlight. */
+  cursor: number | null
 }
 
 export type NavAction =
   | { type: 'drillIn'; goalId: string; changeId?: string }
-  | { type: 'drillOut' }
+  | { type: 'drillOut'; cursor?: number }
+  | { type: 'cursor'; index: number }
   | { type: 'jump'; focus: SummaryPath }
   | { type: 'mode'; mode: NavState['mode'] }
   | { type: 'openFile'; path: string }
@@ -24,6 +27,7 @@ export const initialNav: NavState = {
   path: { level: 'source' },
   file: null,
   direction: 1,
+  cursor: null,
 }
 
 const DEPTH = { source: 0, goal: 1, change: 2 } as const
@@ -40,6 +44,7 @@ export function navReducer(state: NavState, action: NavAction): NavState {
         mode: 'summary',
         path: toPath(action.goalId, action.changeId),
         direction: 1,
+        cursor: null,
       }
     case 'drillOut': {
       if (state.mode === 'files') return { ...state, mode: 'summary', direction: -1 }
@@ -47,7 +52,7 @@ export function navReducer(state: NavState, action: NavAction): NavState {
       if (path.level === 'source') return state
       const up: SummaryPath =
         path.level === 'change' ? { level: 'goal', goalId: path.goalId } : { level: 'source' }
-      return { ...state, path: up, direction: -1 }
+      return { ...state, path: up, direction: -1, cursor: action.cursor ?? null }
     }
     case 'jump':
       return {
@@ -55,7 +60,10 @@ export function navReducer(state: NavState, action: NavAction): NavState {
         mode: 'summary',
         path: action.focus,
         direction: DEPTH[action.focus.level] > DEPTH[state.path.level] ? 1 : -1,
+        cursor: null,
       }
+    case 'cursor':
+      return { ...state, cursor: action.index }
     case 'mode':
       return { ...state, mode: action.mode }
     case 'openFile':
@@ -66,6 +74,7 @@ export function navReducer(state: NavState, action: NavAction): NavState {
         mode: 'summary',
         path: toPath(action.goalId, action.changeId),
         direction: 1,
+        cursor: null,
       }
   }
 }
@@ -116,5 +125,5 @@ export function restoreNav(saved: NavState, summary: Summary, files: string[]): 
     }
   }
   const file = saved.file && files.includes(saved.file) ? saved.file : null
-  return { mode: saved.mode, path: restored, file, direction: 1 }
+  return { mode: saved.mode, path: restored, file, direction: 1, cursor: null }
 }

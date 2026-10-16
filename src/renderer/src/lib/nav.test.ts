@@ -32,10 +32,15 @@ describe('navReducer', () => {
     const goal = run({ type: 'drillIn', goalId: 'g1' })
     const change = navReducer(goal, { type: 'drillIn', goalId: 'g1', changeId: 'g1.c1' })
 
-    expect(goal).toMatchObject({ path: { level: 'goal', goalId: 'g1' }, direction: 1 })
+    expect(goal).toMatchObject({
+      path: { level: 'goal', goalId: 'g1' },
+      direction: 1,
+      cursor: null,
+    })
     expect(change).toMatchObject({
       path: { level: 'change', goalId: 'g1', changeId: 'g1.c1' },
       direction: 1,
+      cursor: null,
     })
   })
 
@@ -46,7 +51,11 @@ describe('navReducer', () => {
     const top = navReducer(goal, { type: 'drillOut' })
     const still = navReducer(top, { type: 'drillOut' })
 
-    expect(goal).toMatchObject({ path: { level: 'goal', goalId: 'g1' }, direction: -1 })
+    expect(goal).toMatchObject({
+      path: { level: 'goal', goalId: 'g1' },
+      direction: -1,
+      cursor: null,
+    })
     expect(top.path).toEqual({ level: 'source' })
     expect(still).toBe(top)
   })
@@ -57,7 +66,7 @@ describe('navReducer', () => {
       { type: 'jump', focus: { level: 'source' } },
     )
 
-    expect(state).toMatchObject({ path: { level: 'source' }, direction: -1 })
+    expect(state).toMatchObject({ path: { level: 'source' }, direction: -1, cursor: null })
   })
 
   it('opens a file in the files view and keeps the summary position', () => {
@@ -81,6 +90,7 @@ describe('navReducer', () => {
       mode: 'summary',
       path: { level: 'change', changeId: 'g1.c1' },
       direction: 1,
+      cursor: null,
     })
     expect(currentFocus(state)).toEqual(state.path)
   })
@@ -127,9 +137,10 @@ describe('restoreNav', () => {
       path: { level: 'change', goalId: 'g1', changeId: 'g1.c1' },
       file: null,
       direction: -1,
+      cursor: null,
     }
 
-    expect(restoreNav(saved, summary, ['a.ts'])).toEqual({ ...saved, direction: 1 })
+    expect(restoreNav(saved, summary, ['a.ts'])).toEqual({ ...saved, direction: 1, cursor: null })
   })
 
   it('goes up to the goal when the change is gone, and to the overview when the goal is gone', () => {
@@ -138,12 +149,14 @@ describe('restoreNav', () => {
       path: { level: 'change', goalId: 'g1', changeId: 'g1.c9' },
       file: null,
       direction: 1,
+      cursor: null,
     }
     const goal: NavState = {
       mode: 'summary',
       path: { level: 'goal', goalId: 'g9' },
       file: null,
       direction: 1,
+      cursor: null,
     }
 
     expect(restoreNav(change, summary, []).path).toEqual({ level: 'goal', goalId: 'g1' })
@@ -156,6 +169,7 @@ describe('restoreNav', () => {
       path: { level: 'source' },
       file: 'gone.ts',
       direction: 1,
+      cursor: null,
     }
 
     expect(restoreNav(files, summary, ['a.ts'])).toMatchObject({ mode: 'files', file: null })
