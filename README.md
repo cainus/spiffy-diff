@@ -48,7 +48,9 @@ The app is not signed.
   - "Include uncommitted changes" adds your working tree to the current branch.
 - Click a goal to drill in. Click a change to see its code.
 - **ELI5** beside an explanation asks the agent to explain it again as for a child. Click it again to hide it.
-- Underlined words are terms. A click opens a popup where the agent explains the term. It shows what the agent reads while it works. Terms in the popup are underlined too: a click explains them in the same popup, and the back arrow returns.
+- Select any text in an explanation, a hunk note, or a popup, then press Explain. A popup shows the answer and what the agent reads while it works. Select text in the popup to go deeper; the back arrow returns, and ↻ explains again.
+- Explained phrases are saved per repository in `~/.spiffy/explanations/`. They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
+- At start, Spiffy opens the last source at the place where you left it. Close the source (✕) to start empty next time.
   - dotted blue: technical jargon
   - green, monospace: internal code concepts
   - wavy amber: internal business concepts

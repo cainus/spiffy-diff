@@ -1,10 +1,18 @@
-import { useCallback, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from 'react'
 import type { DeepPartial } from 'ai'
 import type { LoadRequest } from '@shared/ipc'
 import type { SummaryProgress } from '@shared/progress'
 import type { Backend, LoadedSource } from '@shared/source'
 import { hunkOwners, type ModelSummary, type Summary } from '@shared/summary'
-import { initialNav, navReducer, type NavAction, type NavState } from '@/lib/nav'
+import { initialNav, navReducer, restoreNav, type NavAction, type NavState } from '@/lib/nav'
 import { errorText } from '@/lib/errors'
 import { StoreContext, type Store } from './use-store'
 
@@ -20,12 +28,16 @@ export interface AppState {
   progress: SummaryProgress | null
   /** The number of the latest summary run. */
   runId: number
+  /** The request of the open source. Spiffy saves it to open the source again at the next start. */
+  request: LoadRequest | null
+  /** A saved position to restore when the summary arrives. */
+  resumeNav: NavState | null
   backend: Backend
   nav: NavState
 }
 
 type Action =
-  | { type: 'loading' }
+  | { type: 'loading'; request: LoadRequest; resumeNav: NavState | null }
   | { type: 'loaded'; sessionId: string; source: LoadedSource }
   | { type: 'summarizing'; runId: number }
   | { type: 'partial'; partial: DeepPartial<ModelSummary>; runId: number }
@@ -45,8 +57,24 @@ const initial: AppState = {
   partial: null,
   progress: null,
   runId: 0,
+  request: null,
+  resumeNav: null,
   backend: (localStorage.getItem('spiffy.backend') as Backend | null) ?? 'claude',
   nav: initialNav,
+}
+
+const LAST_KEY = 'spiffy.last'
+
+function readLast(): { request: LoadRequest; nav: NavState } | null {
+  try {
+    const last = JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null') as {
+      request?: LoadRequest
+      nav?: NavState
+    } | null
+    return last?.request && last.nav ? { request: last.request, nav: last.nav } : null
+  } catch {
+    return null
+  }
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -60,7 +88,13 @@ function reducer(state: AppState, action: Action): AppState {
   }
   switch (action.type) {
     case 'loading':
-      return { ...initial, backend: state.backend, status: 'loading' }
+      return {
+        ...initial,
+        backend: state.backend,
+        status: 'loading',
+        request: action.request,
+        resumeNav: action.resumeNav,
+      }
     case 'loaded':
       return { ...state, sessionId: action.sessionId, source: action.source }
     case 'summarizing':
@@ -78,8 +112,18 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, progress: action.progress }
     case 'partial':
       return { ...state, partial: action.partial }
-    case 'summary':
-      return { ...state, status: 'ready', summary: action.summary, partial: null }
+    case 'summary': {
+      const files = state.source?.files.map((f) => f.path) ?? []
+      const nav = state.resumeNav ? restoreNav(state.resumeNav, action.summary, files) : state.nav
+      return {
+        ...state,
+        status: 'ready',
+        summary: action.summary,
+        partial: null,
+        nav,
+        resumeNav: null,
+      }
+    }
     case 'error':
       return { ...state, status: 'error', error: action.error }
     case 'backend':
@@ -118,8 +162,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const open = useCallback(
-    async (req: LoadRequest) => {
-      dispatch({ type: 'loading' })
+    async (req: LoadRequest, resumeNav: NavState | null = null) => {
+      dispatch({ type: 'loading', request: req, resumeNav })
       try {
         const { sessionId, source } = await window.spiffy.loadSource(req)
         dispatch({ type: 'loaded', sessionId, source })
@@ -146,6 +190,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [run, setBackend],
   )
 
+  // Save the open source and the position in it. The next start opens it again. See resume below.
+  useEffect(() => {
+    if (!state.request || state.resumeNav) return
+    localStorage.setItem(LAST_KEY, JSON.stringify({ request: state.request, nav: state.nav }))
+  }, [state.request, state.resumeNav, state.nav])
+
+  // At start, open the last source at the saved position.
+  const resumed = useRef(false)
+  useEffect(() => {
+    if (resumed.current) return
+    resumed.current = true
+    const last = readLast()
+    if (last) void open(last.request, last.nav)
+  }, [open])
+
   const owners = useMemo(
     () => (state.summary ? hunkOwners(state.summary) : new Map()),
     [state.summary],
@@ -158,7 +217,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       open,
       resummarize,
       setBackend,
-      close: () => dispatch({ type: 'close' }),
+      close: () => {
+        localStorage.removeItem(LAST_KEY)
+        dispatch({ type: 'close' })
+      },
       nav$: (action) => dispatch({ type: 'nav', action }),
     }),
     [state, owners, open, resummarize, setBackend],

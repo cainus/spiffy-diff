@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Summary } from '@shared/summary'
-import { breadcrumbs, currentFocus, focusLabel, initialNav, navReducer, type NavState } from './nav'
+import {
+  breadcrumbs,
+  currentFocus,
+  focusLabel,
+  initialNav,
+  navReducer,
+  restoreNav,
+  type NavState,
+} from './nav'
 
 const summary: Summary = {
   overview: '',
@@ -109,5 +117,48 @@ describe('focusLabel', () => {
 
   it('names the file in the files view', () => {
     expect(focusLabel(run({ type: 'openFile', path: 'src/a.ts' }), summary)).toBe('File: src/a.ts')
+  })
+})
+
+describe('restoreNav', () => {
+  it('keeps a saved position that still exists', () => {
+    const saved: NavState = {
+      mode: 'summary',
+      path: { level: 'change', goalId: 'g1', changeId: 'g1.c1' },
+      file: null,
+      direction: -1,
+    }
+
+    expect(restoreNav(saved, summary, ['a.ts'])).toEqual({ ...saved, direction: 1 })
+  })
+
+  it('goes up to the goal when the change is gone, and to the overview when the goal is gone', () => {
+    const change: NavState = {
+      mode: 'summary',
+      path: { level: 'change', goalId: 'g1', changeId: 'g1.c9' },
+      file: null,
+      direction: 1,
+    }
+    const goal: NavState = {
+      mode: 'summary',
+      path: { level: 'goal', goalId: 'g9' },
+      file: null,
+      direction: 1,
+    }
+
+    expect(restoreNav(change, summary, []).path).toEqual({ level: 'goal', goalId: 'g1' })
+    expect(restoreNav(goal, summary, []).path).toEqual({ level: 'source' })
+  })
+
+  it('drops a saved file that is not in the source', () => {
+    const files: NavState = {
+      mode: 'files',
+      path: { level: 'source' },
+      file: 'gone.ts',
+      direction: 1,
+    }
+
+    expect(restoreNav(files, summary, ['a.ts'])).toMatchObject({ mode: 'files', file: null })
+    expect(restoreNav({ ...files, file: 'a.ts' }, summary, ['a.ts']).file).toBe('a.ts')
   })
 })

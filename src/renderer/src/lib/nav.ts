@@ -102,3 +102,19 @@ export function focusLabel(state: NavState, summary: Summary | null): string {
   if (last.focus.level === 'goal') return `Goal: ${last.label}`
   return last.label
 }
+
+/** A saved position, checked against a new summary. A part that is gone moves the position up. */
+export function restoreNav(saved: NavState, summary: Summary, files: string[]): NavState {
+  const { path } = saved
+  let restored: NavState['path'] = { level: 'source' }
+  if (path.level !== 'source') {
+    const goal = summary.goals.find((g) => g.id === path.goalId)
+    if (goal) {
+      restored = { level: 'goal', goalId: goal.id }
+      if (path.level === 'change' && goal.changes.some((c) => c.id === path.changeId))
+        restored = path
+    }
+  }
+  const file = saved.file && files.includes(saved.file) ? saved.file : null
+  return { mode: saved.mode, path: restored, file, direction: 1 }
+}

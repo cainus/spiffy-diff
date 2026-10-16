@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseDiff } from '@shared/diff'
@@ -267,6 +267,54 @@ describe('opening a new source', () => {
 
     await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByRole('button', { name: /Retry failed calls/ })).toBeNull()
+  })
+})
+
+describe('resuming', () => {
+  it('opens the last source at the change where you left it', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+    await screen.findByRole('heading', { name: 'Wrap the call' })
+    cleanup()
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Wrap the call' })).toBeTruthy()
+    expect(window.spiffy.loadSource).toHaveBeenLastCalledWith({
+      kind: 'pr',
+      url: 'https://github.com/o/r/pull/1',
+    })
+  })
+
+  it('opens the overview when the saved change is not in the new summary', async () => {
+    localStorage.setItem(
+      'spiffy.last',
+      JSON.stringify({
+        request: { kind: 'pr', url: 'https://github.com/o/r/pull/1' },
+        nav: {
+          mode: 'summary',
+          path: { level: 'change', goalId: 'g9', changeId: 'g9.c1' },
+          file: null,
+        },
+      }),
+    )
+
+    render(<App />)
+
+    expect(await screen.findByRole('button', { name: /Retry failed calls/ })).toBeTruthy()
+  })
+
+  it('shows the start screen after you close the source', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await screen.findByPlaceholderText(/github.com/)
+    cleanup()
+
+    render(<App />)
+
+    expect(await screen.findByPlaceholderText(/github.com/)).toBeTruthy()
+    expect(window.spiffy.loadSource).toHaveBeenCalledTimes(1)
   })
 })
 
