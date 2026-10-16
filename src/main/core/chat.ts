@@ -10,6 +10,7 @@ import { describeFocus, type Focus } from '@shared/focus'
 import type { LoadedSource } from '@shared/source'
 import type { Summary } from '@shared/summary'
 import { STE_RULES } from './style'
+import { estimateTokens, promptHunks } from './summarize'
 
 export interface ChatRequest {
   model: LanguageModel
@@ -18,6 +19,8 @@ export interface ChatRequest {
   messages: UIMessage[]
   focus: Focus
   abortSignal?: AbortSignal
+  /** Above this many estimated tokens, the hunks stay out of the prompt. */
+  diffBudget?: number
 }
 
 function outline(summary: Summary | null): string {
@@ -29,6 +32,14 @@ function outline(summary: Summary | null): string {
     )
     .join('\n')
   return `${summary.overview}\n\nGoals:\n${goals}`
+}
+
+function diffSection(req: ChatRequest): string {
+  const hunks = promptHunks(req.source.files)
+  if (estimateTokens(hunks) > (req.diffBudget ?? 60_000)) {
+    return 'The diff is too large to show here. Read the changed files in your working directory.'
+  }
+  return `The hunks of the diff (lockfiles and generated files are left out):\n\n${hunks}`
 }
 
 function system(req: ChatRequest): string {
@@ -44,8 +55,13 @@ ${source.body.trim() ? `Description:\n${source.body.trim()}\n` : ''}
 Changed files:
 ${files}
 
+Base commit: ${source.baseSha}
+Head commit: ${source.headSha}
+
 Summary:
 ${outline(req.summary)}
+
+${diffSection(req)}
 
 Focus: ${describeFocus(req.focus, req.summary, source.files)}`
 }

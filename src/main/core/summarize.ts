@@ -48,7 +48,7 @@ export function promptHunks(files: DiffFile[]): string {
     .join('\n\n')
 }
 
-function estimateTokens(text: string): number {
+export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 

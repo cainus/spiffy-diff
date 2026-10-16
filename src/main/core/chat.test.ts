@@ -20,7 +20,13 @@ const source: LoadedSource = {
   baseSha: 'b',
   headSha: 'h',
   dirtyHash: null,
-  files: parseDiff(''),
+  files: parseDiff(`diff --git a/src/client.ts b/src/client.ts
+--- a/src/client.ts
++++ b/src/client.ts
+@@ -10 +10 @@
+-call()
++retry(call)
+`),
 }
 
 const summary: Summary = {
@@ -83,5 +89,65 @@ describe('chatStream', () => {
     expect(prompt).toContain('ASD-STE100')
     const text = chunks.flatMap((c) => (c.type === 'text-delta' ? [c.delta] : [])).join('')
     expect(text).toBe('Because calls fail.')
+  })
+})
+
+describe('chatStream context', () => {
+  it('gives the agent the hunks and the base commit, so it does not need git', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunks: [
+            {
+              type: 'finish',
+              finishReason: { unified: 'stop', raw: undefined },
+              logprobs: undefined,
+              usage,
+            },
+          ],
+        }),
+      }),
+    })
+
+    await collect(
+      await chatStream({ model, source, summary, messages, focus: { level: 'source' } }),
+    )
+
+    const prompt = JSON.stringify(model.doStreamCalls[0]!.prompt)
+    expect(prompt).toContain('[h1] src/client.ts')
+    expect(prompt).toContain('+retry(call)')
+    expect(prompt).toContain('Base commit: b')
+  })
+
+  it('leaves the hunks out when they are too large and says so', async () => {
+    const model = new MockLanguageModelV4({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunks: [
+            {
+              type: 'finish',
+              finishReason: { unified: 'stop', raw: undefined },
+              logprobs: undefined,
+              usage,
+            },
+          ],
+        }),
+      }),
+    })
+
+    await collect(
+      await chatStream({
+        model,
+        source,
+        summary,
+        messages,
+        focus: { level: 'source' },
+        diffBudget: 1,
+      }),
+    )
+
+    const prompt = JSON.stringify(model.doStreamCalls[0]!.prompt)
+    expect(prompt).not.toContain('+retry(call)')
+    expect(prompt).toContain('The diff is too large')
   })
 })
