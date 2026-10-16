@@ -1,7 +1,7 @@
-import { relative } from 'node:path'
 import { streamText, type LanguageModel } from 'ai'
 import type { TermEvent } from '@shared/terms'
 import { STE_RULES } from './style'
+import { describeTool } from './tool-activity'
 
 export interface ExplainTermRequest {
   model: LanguageModel
@@ -22,20 +22,6 @@ Your working directory has the code of the change. Use the Read, Grep, and Glob 
 Then write only the explanation: two to five short sentences. Do not tell about your search. Do not use Markdown or headings.
 
 ${STE_RULES}`
-
-function describeTool(name: string, input: unknown, cwd: string): string | null {
-  const i = (input ?? {}) as Record<string, unknown>
-  const path =
-    typeof i['file_path'] === 'string'
-      ? i['file_path']
-      : typeof i['path'] === 'string'
-        ? i['path']
-        : null
-  if (name === 'Read' && path) return `Reading ${path.startsWith(cwd) ? relative(cwd, path) : path}`
-  if (name === 'Grep' && typeof i['pattern'] === 'string') return `Searching for ${i['pattern']}`
-  if (name === 'Glob' && typeof i['pattern'] === 'string') return `Finding files: ${i['pattern']}`
-  return null
-}
 
 /** Explain a phrase. Yields what the agent reads, then the explanation text. */
 export async function* explainTerm(req: ExplainTermRequest): AsyncGenerator<TermEvent> {

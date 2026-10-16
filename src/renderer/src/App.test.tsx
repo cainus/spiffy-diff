@@ -181,7 +181,13 @@ describe('the summary progress', () => {
   it('shows real progress while the agent reads the code', async () => {
     let finish: (s: Summary) => void = () => {}
     window.spiffy.summarize = vi.fn((_id, _backend, _onPartial, onProgress) => {
-      onProgress?.({ plan: 'single', phase: 'reading', done: 1, total: 2, file: 'src/client.ts' })
+      onProgress?.({
+        plan: 'single',
+        phase: 'reading',
+        done: 6,
+        total: 0,
+        activity: 'Reading src/client.ts',
+      })
       return new Promise<Summary>((r) => (finish = r))
     })
     const user = userEvent.setup()
@@ -190,7 +196,7 @@ describe('the summary progress', () => {
     await user.click(screen.getByRole('button', { name: 'Explain' }))
 
     expect(
-      await screen.findByText('The agent reads the code: 1 of 2 files (src/client.ts)'),
+      await screen.findByText('The agent reads the code: 6 steps · Reading src/client.ts'),
     ).toBeTruthy()
     expect(
       screen.getByRole('progressbar', { name: 'Summary progress' }).getAttribute('aria-valuenow'),

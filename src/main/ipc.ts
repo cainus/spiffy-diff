@@ -33,6 +33,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     summarize: async (source, cwd, backend, onPartial, onProgress) =>
       summarize(source, {
         model: await createModel(backend, cwd),
+        cwd,
         onPartial,
         onProgress,
         investigate: true,

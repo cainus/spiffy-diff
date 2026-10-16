@@ -217,31 +217,85 @@ describe('summarize', () => {
     expect(summary.goals[0]!.title).toBe('Retry failed calls')
   })
 
-  it('reports real progress: the changed files that the agent reads, then the hunks that get a change', async () => {
+  it('reports real progress: each step of the agent while it reads, then the hunks that get a change', async () => {
     let call = 0
     const model = new MockLanguageModelV4({
       doStream: async () =>
         call++ === 0
-          ? investigationStream(
-              ['/ws/src/client.ts', '/ws/src/client.ts', '/ws/README.md', '/ws/src/retry.ts'],
-              'notes',
-            )
+          ? investigationStream(['/ws/src/client.ts', '/ws/README.md', '/ws/lib/other.py'], 'notes')
           : streamJson(JSON.stringify(answer)),
     })
     const events: SummaryProgress[] = []
 
-    await summarize(source, { model, investigate: true, onProgress: (p) => events.push(p) })
+    await summarize(source, {
+      model,
+      cwd: '/ws',
+      investigate: true,
+      onProgress: (p) => events.push(p),
+    })
 
     const reading = events.filter((e) => e.phase === 'reading')
-    expect(reading.map((e) => [e.done, e.total, e.file])).toEqual([
-      [0, 2, undefined],
-      [1, 2, 'src/client.ts'],
-      [2, 2, 'src/retry.ts'],
+    expect(reading.map((e) => [e.done, e.activity])).toEqual([
+      [0, undefined],
+      [1, 'Reading src/client.ts'],
+      [2, 'Reading README.md'],
+      [3, 'Reading lib/other.py'],
+      [3, 'Writing the findings'],
     ])
     const summarizing = events.filter((e) => e.phase === 'summarizing')
     expect(summarizing.at(-1)).toMatchObject({ done: 2, total: 2 })
     expect(summarizing.every((e, i) => i === 0 || e.done >= summarizing[i - 1]!.done)).toBe(true)
+    expect(events.at(-1)).toMatchObject({ phase: 'noting', done: 2, total: 2 })
     expect(events.every((e) => e.plan === 'single')).toBe(true)
+  })
+
+  it('tells when the agent stops its steps and writes the findings', async () => {
+    let call = 0
+    const model = new MockLanguageModelV4({
+      doStream: async () =>
+        call++ === 0
+          ? investigationStream(['/ws/src/client.ts'], 'FINDING: x')
+          : streamJson(JSON.stringify(answer)),
+    })
+    const events: SummaryProgress[] = []
+
+    await summarize(source, {
+      model,
+      cwd: '/ws',
+      investigate: true,
+      onProgress: (p) => events.push(p),
+    })
+
+    const reading = events.filter((e) => e.phase === 'reading')
+    expect(reading.at(-1)).toEqual({
+      plan: 'single',
+      phase: 'reading',
+      done: 1,
+      total: 0,
+      activity: 'Writing the findings',
+    })
+  })
+
+  it('counts the hunk notes after it places the hunks', async () => {
+    const withNotes = {
+      ...answer,
+      hunkNotes: [
+        { hunkId: 'h1', note: 'One.' },
+        { hunkId: 'h2', note: 'Two.' },
+      ],
+    }
+    const model = new MockLanguageModelV4({
+      doStream: async () => streamJson(JSON.stringify(withNotes)),
+    })
+    const events: SummaryProgress[] = []
+
+    await summarize(source, { model, onProgress: (p) => events.push(p) })
+
+    const noting = events.filter((e) => e.phase === 'noting')
+    expect(noting.map((e) => e.done)).toContain(2)
+    expect(events.findIndex((e) => e.phase === 'noting')).toBeGreaterThan(
+      events.findLastIndex((e) => e.phase === 'summarizing'),
+    )
   })
 
   it('asks the model for one note for each hunk', async () => {

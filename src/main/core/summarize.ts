@@ -5,6 +5,7 @@ import { isNoise } from '@shared/noise'
 import type { SummaryProgress } from '@shared/progress'
 import type { LoadedSource } from '@shared/source'
 import { STE_RULES } from './style'
+import { describeTool } from './tool-activity'
 import { buildSummary, modelSummarySchema, type ModelSummary, type Summary } from '@shared/summary'
 
 type PartialSummary = DeepPartial<ModelSummary>
@@ -15,6 +16,8 @@ export interface SummarizeOptions {
   tokenBudget?: number
   /** How many file summaries run at the same time in map-reduce. */
   concurrency?: number
+  /** The workspace folder. Progress shows tool paths relative to it. */
+  cwd?: string
   onPartial?: (partial: PartialSummary) => void
   /** Read the code with tools first, to find why it changed. */
   investigate?: boolean
@@ -150,14 +153,20 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
   })
   const hunkIds = new Set(readableFiles(source.files).flatMap((f) => f.hunks.map((h) => h.id)))
   let placed = 0
-  const report = (done: number): void =>
-    opts.onProgress?.({ plan, phase: 'summarizing', done, total: hunkIds.size })
-  report(0)
+  let noted = 0
+  const report = (phase: 'summarizing' | 'noting', done: number): void =>
+    opts.onProgress?.({ plan, phase, done, total: hunkIds.size })
+  report('summarizing', 0)
   for await (const partial of result.partialOutputStream) {
     if (!isWellFormed(partial)) continue
     opts.onPartial?.(partial)
-    const now = countPlaced(partial, hunkIds)
-    if (now > placed) report((placed = now))
+    // The model writes the goals first, then the hunk notes.
+    const notes = countNoted(partial, hunkIds)
+    if (notes > noted) report('noting', (noted = notes))
+    else if (noted === 0) {
+      const now = countPlaced(partial, hunkIds)
+      if (now > placed) report('summarizing', (placed = now))
+    }
   }
   const summary = buildSummary(await finalObject(result), source.files)
   // In map-reduce, the hunk descriptions of the file pass fill the notes that the model left out.
@@ -169,9 +178,16 @@ export async function summarize(source: LoadedSource, opts: SummarizeOptions): P
     },
     source.files,
   ).hunkNotes
-  // The coverage check puts every hunk in a change, so all hunks are placed now.
-  report(hunkIds.size)
+  // The coverage check puts every hunk in a change, and the notes are done. The bar must not move back.
+  report('noting', hunkIds.size)
   return { ...summary, hunkNotes: { ...fromDigest, ...summary.hunkNotes } }
+}
+
+function countNoted(partial: PartialSummary, hunkIds: Set<string>): number {
+  const noted = new Set<string>()
+  for (const n of partial.hunkNotes ?? [])
+    if (n?.hunkId && n.note && hunkIds.has(n.hunkId)) noted.add(n.hunkId)
+  return noted.size
 }
 
 function countPlaced(partial: PartialSummary, hunkIds: Set<string>): number {
@@ -184,17 +200,16 @@ function countPlaced(partial: PartialSummary, hunkIds: Set<string>): number {
   return placed.size
 }
 
-/** The investigation pass. It reports each changed file that the agent opens with a tool. */
+/** The investigation pass. It reports each tool call of the agent. */
 async function investigate(
   source: LoadedSource,
   body: string,
   plan: SummaryProgress['plan'],
   opts: SummarizeOptions,
 ): Promise<string> {
-  const paths = readableFiles(source.files).map((f) => f.path)
-  const read = new Set<string>()
-  const report = (file?: string): void =>
-    opts.onProgress?.({ plan, phase: 'reading', done: read.size, total: paths.length, file })
+  let steps = 0
+  const report = (activity?: string): void =>
+    opts.onProgress?.({ plan, phase: 'reading', done: steps, total: 0, activity })
   report()
   const result = streamText({
     model: opts.model,
@@ -202,14 +217,15 @@ async function investigate(
     abortSignal: opts.abortSignal,
     prompt: `${sourceIntro(source)}\n\n${body}`,
   })
+  let writing = false
   for await (const part of result.fullStream) {
-    if (part.type !== 'tool-call') continue
-    const input = JSON.stringify(part.input)
-    for (const path of paths) {
-      if (!read.has(path) && input.includes(path)) {
-        read.add(path)
-        report(path)
-      }
+    if (part.type === 'tool-call') {
+      steps++
+      writing = false
+      report(describeTool(part.toolName, part.input, opts.cwd) ?? `Using ${part.toolName}`)
+    } else if (part.type === 'text-delta' && !writing) {
+      writing = true
+      report('Writing the findings')
     }
   }
   return result.text
