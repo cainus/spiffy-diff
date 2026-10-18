@@ -3,7 +3,7 @@ import { parsePrUrl, summaryCacheKey } from './source'
 
 describe('parsePrUrl', () => {
   it.each([
-    ['https://github.com/Abine-Inc/joindeleteme/pull/3300', 'Abine-Inc', 'joindeleteme', 3300],
+    ['https://github.com/acme-co/widget-api/pull/3300', 'acme-co', 'widget-api', 3300],
     ['https://github.com/cainus/spiffy/pull/7/files', 'cainus', 'spiffy', 7],
     ['github.com/cainus/spiffy/pull/12?diff=split', 'cainus', 'spiffy', 12],
     ['  https://github.com/a/b/pull/1#discussion_r1  ', 'a', 'b', 1],
@@ -57,7 +57,7 @@ describe('summaryCacheKey', () => {
   it('is safe to use as a file name', () => {
     expect(
       summaryCacheKey({
-        repo: 'Abine-Inc/joindeleteme',
+        repo: 'acme-co/widget-api',
         baseSha: 'a',
         headSha: 'b',
         dirtyHash: null,
