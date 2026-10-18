@@ -1,5 +1,7 @@
 # spiffy-diff
 
+![spiffy-diff explains a pull request from the top down](docs/brag.gif)
+
 spiffy-diff is a desktop app. It explains a GitHub pull request or a local branch from the top down:
 
 1. **Goals**: the main purposes of the changes.
