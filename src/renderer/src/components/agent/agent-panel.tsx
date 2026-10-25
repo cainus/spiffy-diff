@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Crosshair, Loader2, Sparkles } from 'lucide-react'
+import { Crosshair, Loader2, Pencil, Plus, Sparkles } from 'lucide-react'
 import {
   Conversation,
   ConversationContent,
@@ -18,11 +18,14 @@ import {
   PromptInputTools,
 } from '@/components/ai-elements/prompt-input'
 import { Shimmer } from '@/components/ai-elements/shimmer'
+import { Button } from '@/components/ui/button'
+import { SkillDialog } from '@/components/agent/skill-dialog'
 import { agentActivity } from '@/lib/agent-activity'
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion'
 import { ContextBox, IpcChatTransport } from '@/lib/ipc-transport'
 import { currentFocus, focusLabel } from '@/lib/nav'
 import { spring } from '@/lib/motion'
+import { useSkills, type Skill } from '@/lib/skills'
 import { useStore } from '@/state/use-store'
 
 const SUGGESTIONS = {
@@ -52,6 +55,10 @@ export function AgentPanel() {
   })
   const label = focusLabel(store.nav, store.summary)
   const activity = agentActivity(messages, status)
+
+  const { skills, save, remove } = useSkills()
+  // undefined: closed. null: a new skill.
+  const [editing, setEditing] = useState<Skill | null | undefined>(undefined)
 
   const ask = (text: string) => {
     if (text.trim()) void sendMessage({ text })
@@ -130,6 +137,39 @@ export function AgentPanel() {
             <Suggestion key={s} suggestion={s} onClick={ask} />
           ))}
         </Suggestions>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {skills.map((s) => (
+            <span key={s.id} className="inline-flex items-center rounded-full border text-xs">
+              <button
+                type="button"
+                title={s.prompt}
+                disabled={status === 'submitted' || status === 'streaming'}
+                onClick={() => ask(s.prompt)}
+                className="hover:bg-accent cursor-pointer rounded-l-full py-1 pr-1.5 pl-3 disabled:cursor-default disabled:opacity-50"
+              >
+                {s.name}
+              </button>
+              <button
+                type="button"
+                aria-label={`Edit skill ${s.name}`}
+                onClick={() => setEditing(s)}
+                className="text-muted-foreground hover:bg-accent cursor-pointer rounded-r-full py-1 pr-2 pl-1"
+              >
+                <Pencil className="size-3" />
+              </button>
+            </span>
+          ))}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Add skill"
+            title="Add a skill button"
+            onClick={() => setEditing(null)}
+          >
+            <Plus />
+          </Button>
+        </div>
         <PromptInput onSubmit={(m) => ask(m.text)}>
           <PromptInputBody>
             <PromptInputTextarea placeholder="Ask a question…" />
@@ -156,6 +196,14 @@ export function AgentPanel() {
           </PromptInputFooter>
         </PromptInput>
       </div>
+      {editing !== undefined && (
+        <SkillDialog
+          skill={editing}
+          onSave={save}
+          onDelete={remove}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
     </div>
   )
 }

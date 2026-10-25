@@ -79,7 +79,7 @@ function fakeBridge(): SpiffyBridge {
     summarize: vi.fn(async () => summary),
     chat: vi.fn(() => () => {}),
     pickRepoFolder: vi.fn(async () => null),
-    listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
+    listSources: vi.fn(async () => ({ current: 'main', candidates: [] })),
     simplify: vi.fn(() => () => {}),
     explainTerm: vi.fn(() => () => {}),
     explanations: vi.fn(async () => ({})),
@@ -162,6 +162,54 @@ describe('the agent panel', () => {
     expect(
       within(screen.getByRole('log')).getByText('Explain the changes in this file.'),
     ).toBeTruthy()
+  })
+})
+
+describe('skill buttons', () => {
+  async function addSkill(user: Awaited<ReturnType<typeof openPr>>, name: string, prompt: string) {
+    await user.click(screen.getByRole('button', { name: 'Add skill' }))
+    await user.type(screen.getByLabelText('Skill name'), name)
+    await user.type(screen.getByLabelText('Skill prompt'), prompt)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+  }
+
+  it('adds a skill button that sends its prompt and shows the answer in the panel', async () => {
+    const user = await openPr()
+    await addSkill(user, 'Find bugs', 'List the bugs in this change.')
+
+    await user.click(await screen.findByRole('button', { name: 'Find bugs' }))
+
+    await vi.waitFor(() =>
+      expect(bridge.chat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [expect.objectContaining({ role: 'user' })],
+        }),
+        expect.anything(),
+      ),
+    )
+    await vi.waitFor(() =>
+      expect(screen.getByRole('log').textContent).toContain('The goal stops failed calls.'),
+    )
+  })
+
+  it('edits and deletes a skill, and keeps skills after a reload', async () => {
+    const user = await openPr()
+    await addSkill(user, 'Find bugs', 'List the bugs.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit skill Find bugs' }))
+    await user.clear(screen.getByLabelText('Skill name'))
+    await user.type(screen.getByLabelText('Skill name'), 'Find risks')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('button', { name: 'Find risks' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Find bugs' })).toBeNull()
+    expect(JSON.parse(localStorage.getItem('spiffy.skills')!)).toEqual([
+      expect.objectContaining({ name: 'Find risks', prompt: 'List the bugs.' }),
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Edit skill Find risks' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Find risks' })).toBeNull())
+    expect(localStorage.getItem('spiffy.skills')).toBe('[]')
   })
 })
 
