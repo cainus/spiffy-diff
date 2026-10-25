@@ -2,36 +2,25 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { FolderGit2, GitPullRequest, Loader2 } from 'lucide-react'
 import { parsePrUrl } from '@shared/source'
-import type { BranchList } from '@shared/ipc'
+import type { SourceList } from '@shared/ipc'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { BackendPicker } from '@/components/backend-picker'
+import { SourcePicker } from '@/components/source-picker'
 import { spring } from '@/lib/motion'
 import { useStore } from '@/state/use-store'
 
 export function StartScreen() {
   const { open, status, error } = useStore()
   const [url, setUrl] = useState('')
-  const [repo, setRepo] = useState<{ path: string; list: BranchList } | null>(null)
-  const [branch, setBranch] = useState('')
-  const [dirty, setDirty] = useState(false)
+  const [repo, setRepo] = useState<{ path: string; list: SourceList } | null>(null)
   const busy = status === 'loading'
   const validUrl = parsePrUrl(url) !== null
 
   const pickRepo = async () => {
     const path = await window.spiffy.pickRepoFolder()
     if (!path) return
-    const list = await window.spiffy.listBranches(path)
-    setRepo({ path, list })
-    setBranch(list.current)
+    setRepo({ path, list: await window.spiffy.listSources(path) })
   }
 
   return (
@@ -100,44 +89,12 @@ export function StartScreen() {
                 transition={spring}
                 className="space-y-3 overflow-hidden"
               >
-                <div className="flex gap-2">
-                  <Select value={branch} onValueChange={setBranch}>
-                    <SelectTrigger className="h-11 flex-1">
-                      <SelectValue placeholder="Branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {repo.list.branches.map((b) => (
-                        <SelectItem key={b} value={b}>
-                          {b}
-                          {b === repo.list.current ? ' (current)' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="lg"
-                    className="h-11"
-                    disabled={!branch || busy}
-                    onClick={() =>
-                      void open({
-                        kind: 'branch',
-                        repoPath: repo.path,
-                        branch,
-                        includeUncommitted: dirty,
-                      })
-                    }
-                  >
-                    Explain
-                  </Button>
-                </div>
-                <label className="text-muted-foreground flex items-center gap-2 text-sm">
-                  <Switch
-                    checked={dirty}
-                    onCheckedChange={setDirty}
-                    disabled={branch !== repo.list.current}
-                  />
-                  Include uncommitted changes
-                </label>
+                <SourcePicker
+                  repoPath={repo.path}
+                  list={repo.list}
+                  busy={busy}
+                  onOpen={(req) => void open(req)}
+                />
               </motion.div>
             )}
           </AnimatePresence>

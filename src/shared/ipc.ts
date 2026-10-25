@@ -53,9 +53,40 @@ export interface StreamHandlers<T> {
   onError: (message: string) => void
 }
 
-export interface BranchList {
+/** A local branch that the user can explain. */
+export interface BranchCandidate {
+  kind: 'branch'
+  name: string
+  current: boolean
+  author: string
+  /** ISO date of the last commit. */
+  updatedAt: string
+  /** The default branch of `origin` already has all commits of the branch. */
+  merged: boolean
+  /** The last commit is by the git user. */
+  mine: boolean
+}
+
+/** An open pull request that the user can explain. */
+export interface PrCandidate {
+  kind: 'pr'
+  number: number
+  title: string
+  url: string
+  /** The head branch of the pull request. */
+  branch: string
+  author: string
+  updatedAt: string
+  draft: boolean
+  /** The GitHub user opened the pull request. */
+  mine: boolean
+}
+
+export type SourceCandidate = BranchCandidate | PrCandidate
+
+export interface SourceList {
   current: string
-  branches: string[]
+  candidates: SourceCandidate[]
 }
 
 /** The API that the preload script gives to the renderer as `window.spiffy`. */
@@ -69,7 +100,8 @@ export interface SpiffyBridge {
   ): Promise<Summary>
   chat(req: ChatTurnRequest, handlers: StreamHandlers<UIMessageChunk>): () => void
   pickRepoFolder(): Promise<string | null>
-  listBranches(repoPath: string): Promise<BranchList>
+  /** The local branches and the open pull requests of a repository. */
+  listSources(repoPath: string): Promise<SourceList>
   /** Explain a text again as for a child (ELI5). The chunks are text. */
   simplify(req: SimplifyRequest, handlers: StreamHandlers<string>): () => void
   /** Write one change again. Main saves the new change in the summary cache before `done`. */

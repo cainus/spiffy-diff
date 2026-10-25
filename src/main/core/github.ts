@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { parseDiff } from '@shared/diff'
+import type { PrCandidate } from '@shared/ipc'
 import { parsePrUrl, type LoadedSource, type SourceHead } from '@shared/source'
 import type { OpenPr } from './git'
 
@@ -83,5 +84,59 @@ export async function findOpenPr(
     return (JSON.parse(out) as OpenPr[])[0] ?? null
   } catch {
     return null
+  }
+}
+
+const PR_LIMIT = 200
+
+/** The open pull requests of the repo, newest update first. Empty when `gh` fails. */
+export async function listOpenPrs(cwd: string, gh: GhRunner): Promise<PrCandidate[]> {
+  try {
+    const [list, viewer] = await Promise.all([
+      gh(
+        [
+          'pr',
+          'list',
+          '--state',
+          'open',
+          '--limit',
+          String(PR_LIMIT),
+          '--json',
+          'number,title,url,headRefName,author,updatedAt,isDraft',
+        ],
+        cwd,
+      ),
+      gh(['api', 'user', '--jq', '.login']).then(
+        (out) => out.trim(),
+        () => '',
+      ),
+    ])
+    const prs = JSON.parse(list) as {
+      number: number
+      title: string
+      url: string
+      headRefName: string
+      author: { login: string } | null
+      updatedAt: string
+      isDraft: boolean
+    }[]
+    return prs
+      .map((pr): PrCandidate => {
+        const author = pr.author?.login ?? ''
+        return {
+          kind: 'pr',
+          number: pr.number,
+          title: pr.title,
+          url: pr.url,
+          branch: pr.headRefName,
+          author,
+          updatedAt: pr.updatedAt,
+          draft: pr.isDraft,
+          mine: viewer !== '' && author === viewer,
+        }
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  } catch {
+    return []
   }
 }

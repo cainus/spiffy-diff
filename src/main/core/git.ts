@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { basename } from 'node:path'
 import { promisify } from 'node:util'
 import { parseDiff } from '@shared/diff'
-import type { BranchList } from '@shared/ipc'
+import type { BranchCandidate } from '@shared/ipc'
 import type { LoadedSource, SourceHead } from '@shared/source'
 
 const exec = promisify(execFile)
@@ -101,10 +101,47 @@ export async function loadBranchSource(
   }
 }
 
-export async function listBranches(cwd: string): Promise<BranchList> {
+const FIELD = '\u001f'
+
+/** The local branches, newest commit first, with the current branch marked. */
+export async function listBranches(
+  cwd: string,
+): Promise<{ current: string; branches: BranchCandidate[] }> {
   const current = await gitLine(cwd, 'rev-parse', '--abbrev-ref', 'HEAD')
-  const all = (await gitLine(cwd, 'branch', '--format=%(refname:short)', '--sort=-committerdate'))
+  const rows = await gitLine(
+    cwd,
+    'for-each-ref',
+    '--sort=-committerdate',
+    `--format=%(refname:short)${FIELD}%(authorname)${FIELD}%(committerdate:iso-strict)`,
+    'refs/heads',
+  )
+  const me = await gitLine(cwd, 'config', 'user.name').catch(() => '')
+  const merged = await mergedBranches(cwd)
+  const branches = rows
     .split('\n')
     .filter(Boolean)
-  return { current, branches: [current, ...all.filter((b) => b !== current)] }
+    .map((row): BranchCandidate => {
+      const [name, author, updatedAt] = row.split(FIELD) as [string, string, string]
+      return {
+        kind: 'branch',
+        name,
+        current: name === current,
+        author,
+        updatedAt,
+        merged: merged.has(name),
+        mine: me !== '' && author === me,
+      }
+    })
+  return { current, branches }
+}
+
+/** The local branches that the default branch of `origin` already contains. */
+async function mergedBranches(cwd: string): Promise<Set<string>> {
+  try {
+    const base = `origin/${await defaultBranch(cwd)}`
+    const out = await gitLine(cwd, 'branch', '--merged', base, '--format=%(refname:short)')
+    return new Set(out.split('\n').filter(Boolean))
+  } catch {
+    return new Set()
+  }
 }

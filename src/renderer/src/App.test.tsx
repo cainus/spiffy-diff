@@ -88,7 +88,7 @@ function fakeBridge(): SpiffyBridge {
     checkSource: vi.fn(async () => false),
     rerunChange: vi.fn(() => () => {}),
     pickRepoFolder: vi.fn(async () => null),
-    listBranches: vi.fn(async () => ({ current: 'main', branches: ['main'] })),
+    listSources: vi.fn(async () => ({ current: 'main', candidates: [] })),
     linkRepo: vi.fn(async () => {}),
     simplify: vi.fn(() => () => {}),
     explainTerm: vi.fn(() => () => {}),

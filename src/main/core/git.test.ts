@@ -124,7 +124,34 @@ describe('loadBranchSource', () => {
 
 describe('listBranches', () => {
   it('lists local branches with the current branch first', async () => {
-    expect(await listBranches(repo)).toEqual({ current: 'feature', branches: ['feature', 'trunk'] })
+    const { current, branches } = await listBranches(repo)
+
+    expect(current).toBe('feature')
+    // The commits can share a second, so the order is not fixed.
+    expect(branches.map((b) => [b.name, b.current]).sort()).toEqual([
+      ['feature', true],
+      ['trunk', false],
+    ])
+  })
+
+  it('marks the branches that the default branch of origin contains', async () => {
+    const { branches } = await listBranches(repo)
+
+    expect(branches.map((b) => [b.name, b.merged]).sort()).toEqual([
+      ['feature', false],
+      ['trunk', true],
+    ])
+  })
+
+  it('marks the branches of the git user, and gives the author and the date', async () => {
+    git(repo, 'config', 'user.name', 'Ada')
+    commit(repo, 'c.txt', 'x\n')
+
+    const feature = (await listBranches(repo)).branches.find((b) => b.name === 'feature')!
+
+    expect(feature.mine).toBe(false)
+    expect(feature.author).toBe('t')
+    expect(Date.parse(feature.updatedAt)).not.toBeNaN()
   })
 })
 

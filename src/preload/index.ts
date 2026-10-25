@@ -65,7 +65,7 @@ const api: SpiffyBridge = {
   rerunChange: (req, handlers) => stream<RerunEvent>('rerun', req, handlers),
 
   pickRepoFolder: () => ipcRenderer.invoke('repo:pick'),
-  listBranches: (repoPath) => ipcRenderer.invoke('repo:branches', repoPath),
+  listSources: (repoPath) => ipcRenderer.invoke('repo:sources', repoPath),
   linkRepo: (sessionId, repoPath) => ipcRenderer.invoke('repo:link', sessionId, repoPath),
 }
 

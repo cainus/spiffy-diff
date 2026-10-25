@@ -7,6 +7,7 @@ import type {
   LoadRequest,
   RerunRequest,
   SimplifyRequest,
+  SourceList,
   TermRequest,
 } from '@shared/ipc'
 import type { RerunEvent } from '@shared/rerun'
@@ -15,7 +16,7 @@ import type { Backend } from '@shared/source'
 import { createModel } from './core/backends'
 import { chatStream } from './core/chat'
 import { branchHead, listBranches, loadBranchSource, repoName } from './core/git'
-import { findOpenPr, loadPrSource, prHead, runGh } from './core/github'
+import { findOpenPr, listOpenPrs, loadPrSource, prHead, runGh } from './core/github'
 import { Sessions } from './core/session'
 import { explainTerm, whenExplained } from './core/explain-term'
 import { rerunChange } from './core/rerun-change'
@@ -162,5 +163,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('repo:link', (_e, sessionId: string, path: string) =>
     sessions.linkRepo(sessionId, path),
   )
-  ipcMain.handle('repo:branches', (_e, repoPath: string) => listBranches(repoPath))
+  ipcMain.handle('repo:sources', async (_e, repoPath: string): Promise<SourceList> => {
+    const [branches, prs] = await Promise.all([
+      listBranches(repoPath),
+      listOpenPrs(repoPath, runGh),
+    ])
+    return { current: branches.current, candidates: [...prs, ...branches.branches] }
+  })
 }
