@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Crosshair, Loader2, Pencil, Plus, Sparkles } from 'lucide-react'
+import { Crosshair, Loader2, Pencil, Pin, PinOff, Plus, Sparkles, X } from 'lucide-react'
 import {
   Conversation,
   ConversationContent,
@@ -40,7 +40,16 @@ const SUGGESTIONS = {
 } as const
 
 /** One conversation for each source. Each message sends the current focus. See PLAN.md decision 7. */
-export function AgentPanel() {
+export function AgentPanel({
+  pinned,
+  onPin,
+  onClose,
+}: {
+  /** A pinned panel is beside the content. An unpinned panel floats over it. */
+  pinned: boolean
+  onPin: () => void
+  onClose: () => void
+}) {
   const store = useStore()
   const focus = currentFocus(store.nav)
   // The transport reads the context at send time, never during render.
@@ -70,6 +79,27 @@ export function AgentPanel() {
         <Sparkles className="text-primary size-4" />
         <span className="text-sm font-medium">Agent</span>
         <span className="text-muted-foreground ml-auto text-xs capitalize">{store.backend}</span>
+        <Button
+          type="button"
+          variant={pinned ? 'secondary' : 'ghost'}
+          size="icon-xs"
+          aria-label="Pin the agent"
+          aria-pressed={pinned}
+          title={pinned ? 'Float the agent over the content' : 'Put the agent beside the content'}
+          onClick={onPin}
+        >
+          {pinned ? <PinOff /> : <Pin />}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Close the agent"
+          title="Close the agent"
+          onClick={onClose}
+        >
+          <X />
+        </Button>
       </div>
 
       <Conversation className="min-h-0 flex-1">
@@ -88,7 +118,8 @@ export function AgentPanel() {
                 transition={spring}
               >
                 <Message from={m.role}>
-                  <MessageContent>
+                  {/* You can select text in an answer to explain it. The answer is the context. */}
+                  <MessageContent data-explainable={m.role === 'assistant' ? '' : undefined}>
                     {m.parts.map((p, i) =>
                       p.type === 'text' ? (
                         <MessageResponse key={i}>{p.text}</MessageResponse>

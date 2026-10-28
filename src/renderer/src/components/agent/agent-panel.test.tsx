@@ -165,6 +165,64 @@ describe('the agent panel', () => {
   })
 })
 
+describe('closing and pinning', () => {
+  const panel = () => document.querySelector('[data-agent-panel]')!
+
+  async function ask(user: ReturnType<typeof userEvent.setup>) {
+    const box = await screen.findByPlaceholderText('Ask a question…')
+    box.focus()
+    await user.keyboard('Why?')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await vi.waitFor(() =>
+      expect(screen.getByRole('log').textContent).toContain('The goal stops failed calls.'),
+    )
+  }
+
+  it('closes with the x button in the panel', async () => {
+    const user = await openPr()
+
+    await user.click(await screen.findByRole('button', { name: 'Close the agent' }))
+
+    expect(panel().hasAttribute('hidden')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Agent' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('floats over the content, and the pin button puts it beside the content and remembers that', async () => {
+    const user = await openPr()
+    const pin = await screen.findByRole('button', { name: 'Pin the agent' })
+    expect(pin.getAttribute('aria-pressed')).toBe('false')
+    expect(panel().hasAttribute('data-pinned')).toBe(false)
+
+    await user.click(pin)
+
+    expect(pin.getAttribute('aria-pressed')).toBe('true')
+    expect(panel().hasAttribute('data-pinned')).toBe(true)
+    expect(localStorage.getItem('spiffy.agentPinned')).toBe('true')
+  })
+
+  it('starts pinned when you pinned it before', async () => {
+    localStorage.setItem('spiffy.agentPinned', 'true')
+    await openPr()
+
+    const pin = await screen.findByRole('button', { name: 'Pin the agent' })
+    expect(pin.getAttribute('aria-pressed')).toBe('true')
+    expect(panel().hasAttribute('data-pinned')).toBe(true)
+  })
+
+  it('keeps the conversation when you pin it, unpin it, close it, and open it', async () => {
+    const user = await openPr()
+    await ask(user)
+    const pin = screen.getByRole('button', { name: 'Pin the agent' })
+
+    await user.click(pin)
+    await user.click(pin)
+    await user.click(screen.getByRole('button', { name: 'Close the agent' }))
+    await user.click(screen.getByRole('button', { name: 'Agent' }))
+
+    expect(screen.getByRole('log').textContent).toContain('The goal stops failed calls.')
+  })
+})
+
 describe('skill buttons', () => {
   async function addSkill(user: Awaited<ReturnType<typeof openPr>>, name: string, prompt: string) {
     await user.click(screen.getByRole('button', { name: 'Add skill' }))
@@ -544,6 +602,30 @@ describe('explaining a selection', () => {
     await vi.waitFor(() => expect(popup.textContent).toContain('Second answer.'))
     expect(popup.textContent).not.toContain('First answer.')
     expect(bridge.explainTerm).toHaveBeenCalledTimes(2)
+  })
+
+  it('explains text that you select in an answer of the agent, with the answer as the context', async () => {
+    const finish = explainWith({
+      'failed calls': [{ type: 'text', delta: 'A failed call gets an error.' }],
+    })
+    const user = await openPr()
+    const box = await screen.findByPlaceholderText('Ask a question…')
+    box.focus()
+    await user.keyboard('Why?')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const log = screen.getByRole('log')
+    await vi.waitFor(() => expect(log.textContent).toContain('The goal stops failed calls.'))
+
+    select(log, 'failed calls')
+    await user.click(await screen.findByRole('button', { name: 'Explain selection' }))
+    finish('failed calls')
+
+    const popup = await screen.findByRole('dialog', { name: 'failed calls' })
+    await vi.waitFor(() => expect(popup.textContent).toContain('A failed call gets an error.'))
+    expect(bridge.explainTerm).toHaveBeenCalledWith(
+      expect.objectContaining({ phrase: 'failed calls', context: 'The goal stops failed calls.' }),
+      expect.anything(),
+    )
   })
 
   describe('in a change', () => {

@@ -50,13 +50,14 @@ The app is not signed.
   - "Include uncommitted changes" adds your working tree to the current branch.
 - Click a goal to drill in. Click a change to see its code.
 - **ELI5** beside an explanation asks the agent to explain it again as for a child. Click it again to hide it.
-- Select any text in an explanation, a hunk note, or a popup, then press Explain. A popup shows the answer and what the agent reads while it works. Select text in a popup (or click an underlined phrase in it) to open another popup on top, to any depth. Escape closes the top popup; a click in a lower popup closes the popups above it. ↻ explains again.
+- Select any text in an explanation, a hunk note, an answer of the agent, or a popup, then press Explain. A popup shows the answer and what the agent reads while it works. Select text in a popup (or click an underlined phrase in it) to open another popup on top, to any depth. Escape closes the top popup; a click in a lower popup closes the popups above it. ↻ explains again.
 - Explained phrases are saved per repository in `~/.spiffy/explanations/` (the data folder keeps its old name, because git worktrees in it use absolute paths). They are underlined wherever they appear, in this PR and in later PRs of the same repository. A click shows the saved answer.
 - Diffs show Unified or Split (side by side). The choice is on each change page and in the Files view, and it is remembered.
 - Rerun on a change page makes the agent read the code again and write that change and its hunk notes again. The hunks stay in the same change. The new text is saved in the summary cache.
 - Each change has a type: New functionality, Internal change (performance, logging, metrics, dependencies), or Refactor (no behavior change).
 - The first time a change page opens, the agent reads the code and writes the margin notes (what each hunk changes and why) and a note for each block of red or green lines. Point at a red line for "BEFORE: what the old code did", or at a green line for "NOW: what the new code does". Everything is saved in the summary cache.
-- The agent panel starts closed. The Agent button in the top bar opens it; spiffy-diff remembers the choice.
+- The agent panel starts closed. The Agent button in the top bar opens it, and the x in the panel closes it. The panel floats over the content. The pin button puts it beside the content. spiffy-diff remembers both choices.
+- The name of the PR or branch stays at the top, below the top bar, at every level.
 - Keys: ↑/↓ move the highlight (or go to the last/next change or file), → or Enter drills in, ← or Escape drills out.
 - spiffy-diff checks for new commits (or new uncommitted changes on a branch) every minute while the window has the focus, and when you come back to the window. A banner offers Reload, which keeps your place.
 - At start, spiffy-diff opens the last source at the place where you left it. Press Change PR in the top bar to open a different PR or branch.

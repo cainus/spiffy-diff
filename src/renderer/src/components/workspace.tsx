@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { arrowKey } from '@/lib/keys'
+import { sourceName } from '@/lib/source-name'
 import { useAgentToggle } from '@/lib/use-agent-toggle'
 import { breadcrumbs, type NavState } from '@/lib/nav'
 import { spring } from '@/lib/motion'
@@ -183,6 +184,7 @@ export function Workspace() {
             </Button>
           </div>
         </header>
+        {store.source && <SourceName />}
         <VersionBanner />
 
         <AnimatePresence>
@@ -201,41 +203,57 @@ export function Workspace() {
           )}
         </AnimatePresence>
 
-        <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-          <ResizablePanel defaultSize="68%" minSize="40%">
-            <div className="relative h-full overflow-hidden">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div
-                  key={nav.mode}
-                  initial={{ opacity: 0, y: nav.mode === 'files' ? 24 : -24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: nav.mode === 'files' ? -24 : 24 }}
-                  transition={spring}
-                  className="h-full"
-                >
-                  {nav.mode === 'summary' ? <SummaryView /> : <FilesView />}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </ResizablePanel>
-          <ResizableHandle className={cn(!agent.open && 'hidden')} />
-          <ResizablePanel
-            panelRef={agent.panelRef}
-            collapsible
-            collapsedSize="0%"
-            defaultSize={agent.open ? '32%' : '0%'}
-            minSize="20%"
-            onResize={(size) => agent.sync(size.asPercentage > 0)}
-            className={cn(agent.animating && 'transition-[flex-grow] duration-300 ease-out')}
-          >
-            {/* The panel stays mounted when it is closed, so the conversation stays. */}
-            <div data-agent-panel="" hidden={!agent.open} className="h-full">
-              <Suspense fallback={null}>
-                <AgentPanel />
-              </Suspense>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        {/* An unpinned agent floats over the content. This box holds it. */}
+        <div className="relative min-h-0 flex-1">
+          <ResizablePanelGroup orientation="horizontal">
+            <ResizablePanel defaultSize="68%" minSize="40%">
+              <div className="relative h-full overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.div
+                    key={nav.mode}
+                    initial={{ opacity: 0, y: nav.mode === 'files' ? 24 : -24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: nav.mode === 'files' ? -24 : 24 }}
+                    transition={spring}
+                    className="h-full"
+                  >
+                    {nav.mode === 'summary' ? <SummaryView /> : <FilesView />}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle className={cn(!agent.docked && 'hidden')} />
+            <ResizablePanel
+              panelRef={agent.panelRef}
+              collapsible
+              collapsedSize="0%"
+              defaultSize={agent.docked ? '32%' : '0%'}
+              minSize="20%"
+              onResize={(size) => agent.sync(size.asPercentage > 0)}
+              className={cn(agent.animating && 'transition-[flex-grow] duration-300 ease-out')}
+            >
+              {/* The panel stays mounted when it is closed or unpinned, so the conversation stays. */}
+              <div
+                data-agent-panel=""
+                data-pinned={agent.pinned ? '' : undefined}
+                hidden={!agent.open}
+                className={cn(
+                  'h-full',
+                  !agent.pinned &&
+                    'bg-background absolute inset-y-0 right-0 z-30 w-[min(28rem,85%)] border-l shadow-2xl',
+                )}
+              >
+                <Suspense fallback={null}>
+                  <AgentPanel
+                    pinned={agent.pinned}
+                    onPin={agent.togglePin}
+                    onClose={agent.toggle}
+                  />
+                </Suspense>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
         <SelectionExplain />
         <ExplainPopup />
       </div>
@@ -271,6 +289,27 @@ function ModeToggle({
           {m}
         </button>
       ))}
+    </div>
+  )
+}
+
+/** The PR or branch that you look at. It stays at the top at every level. */
+function SourceName() {
+  const { source, request } = useStore()
+  if (!source) return null
+  const name = sourceName(source, request)
+  return (
+    <div
+      data-testid="source-name"
+      className="bg-muted/30 flex h-11 shrink-0 items-center gap-3 border-b px-6"
+    >
+      <span className="bg-primary/10 text-primary shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold">
+        {name.kind}
+      </span>
+      <span title={name.title} className="min-w-0 truncate text-base font-semibold tracking-tight">
+        {name.title}
+      </span>
+      <span className="text-muted-foreground shrink-0 text-xs">{name.where}</span>
     </div>
   )
 }

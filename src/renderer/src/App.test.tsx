@@ -559,6 +559,21 @@ describe('the agent panel toggle', () => {
   })
 })
 
+describe('the source name', () => {
+  it('always shows the PR number and title at the top, also deep in a change', async () => {
+    const user = await openPr()
+    const name = () => screen.getByTestId('source-name')
+    expect(name().textContent).toContain('PR #1')
+    expect(name().textContent).toContain('Add retry')
+    expect(name().textContent).toContain('o/r')
+
+    await user.click(screen.getByRole('button', { name: /Retry failed calls/ }))
+    await user.click(await screen.findByRole('button', { name: /Wrap the call/ }))
+
+    expect(name().textContent).toContain('PR #1')
+  })
+})
+
 describe('change kinds', () => {
   it('shows the kind of each change in the list and on the change page', async () => {
     const user = await openPr()
