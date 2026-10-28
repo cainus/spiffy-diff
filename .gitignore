@@ -6,3 +6,4 @@ release/
 *.log
 coverage/
 scratch/
+*.tsbuildinfo
