@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { FileMinus, FilePen, FilePlus, FileSymlink, Image } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  FileMinus,
+  FilePen,
+  FilePlus,
+  FileSymlink,
+  Image,
+} from 'lucide-react'
 import type { DiffFile } from '@shared/diff'
 import { isNoise } from '@shared/noise'
 import { DiffStyleToggle } from '@/components/diff/diff-style-toggle'
 import { HunkRow } from '@/components/diff/hunk-row'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { fileTree, treeOrder, type TreeNode } from '@/lib/file-tree'
 import { slideVariants, spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/state/use-store'
@@ -19,111 +29,190 @@ function fileStats(f: DiffFile) {
   }
 }
 
+const WIDTH_KEY = 'spiffy.fileListWidth'
+
+function savedWidth(): number {
+  const n = Number(localStorage.getItem(WIDTH_KEY))
+  return n > 0 ? n : 288
+}
+
+type Row =
+  | { kind: 'dir'; name: string; path: string; depth: number; open: boolean }
+  | { kind: 'file'; name: string; file: DiffFile; depth: number }
+
+/** The rows of the tree that show: the files and folders in open folders. */
+function visibleRows(nodes: TreeNode[], collapsed: Set<string>, depth = 0): Row[] {
+  return nodes.flatMap((n): Row[] => {
+    if (n.kind === 'file') return [{ kind: 'file', name: n.name, file: n.file, depth }]
+    const open = !collapsed.has(n.path)
+    return [
+      { kind: 'dir', name: n.name, path: n.path, depth, open },
+      ...(open ? visibleRows(n.children, collapsed, depth + 1) : []),
+    ]
+  })
+}
+
 export function FilesView() {
   const { source, nav, nav$ } = useStore()
-  const files = useMemo(() => source?.files ?? [], [source])
+  const tree = useMemo(() => fileTree(source?.files ?? []), [source])
+  const order = useMemo(() => treeOrder(tree), [tree])
+  const files = useMemo(
+    () => order.map((p) => source!.files.find((f) => f.path === p)!),
+    [order, source],
+  )
   const selected = files.find((f) => f.path === nav.file) ?? files[0]
-  const [order, setOrder] = useState(0)
+  const [direction, setDirection] = useState(0)
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const [width] = useState(savedWidth)
 
   useEffect(() => {
     if (!nav.file && files[0]) nav$({ type: 'openFile', path: files[0].path })
   }, [nav.file, files, nav$])
 
+  // Open the folders of a newly selected file, so that the arrow keys never select a hidden file.
+  const [shown, setShown] = useState(selected?.path)
+  if (selected && selected.path !== shown) {
+    setShown(selected.path)
+    const keep = [...collapsed].filter((d) => !selected.path.startsWith(`${d}/`))
+    if (keep.length !== collapsed.size) setCollapsed(new Set(keep))
+  }
+
   const select = (f: DiffFile) => {
-    setOrder(files.indexOf(f) >= files.indexOf(selected!) ? 1 : -1)
+    setDirection(files.indexOf(f) >= files.indexOf(selected!) ? 1 : -1)
     nav$({ type: 'openFile', path: f.path })
   }
 
-  return (
-    <div className="flex h-full">
-      <ScrollArea className="bg-sidebar/40 h-full w-72 shrink-0 border-r">
-        <ul className="space-y-0.5 p-2">
-          {files.map((f, i) => {
-            const Icon = f.binary ? Image : ICONS[f.status]
-            const s = fileStats(f)
-            const active = f.path === selected?.path
-            return (
-              <motion.li
-                key={f.path}
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ ...spring, delay: Math.min(i * 0.015, 0.3) }}
-              >
-                <button
-                  onClick={() => select(f)}
-                  className={cn(
-                    'relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
-                    active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    isNoise(f.path) && 'opacity-60',
-                  )}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="file-active"
-                      transition={spring}
-                      className="bg-accent absolute inset-0 -z-10 rounded-md"
-                    />
-                  )}
-                  <Icon className="size-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs" title={f.path}>
-                    <span className="text-muted-foreground/70">
-                      {f.path.slice(0, f.path.lastIndexOf('/') + 1)}
-                    </span>
-                    {f.path.slice(f.path.lastIndexOf('/') + 1)}
-                  </span>
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums">
-                    <span className="text-emerald-400">+{s.additions}</span>{' '}
-                    <span className="text-rose-400">-{s.deletions}</span>
-                  </span>
-                </button>
-              </motion.li>
-            )
-          })}
-        </ul>
-      </ScrollArea>
+  const toggle = (path: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(path)) next.add(path)
+      return next
+    })
 
-      <div className="relative min-w-0 flex-1 overflow-hidden">
-        <AnimatePresence mode="popLayout" custom={order} initial={false}>
-          {selected && (
-            <motion.div
-              key={selected.path}
-              custom={order}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              className="h-full"
-            >
-              <ScrollArea className="h-full">
-                <div className="space-y-4 p-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <h2 className="truncate font-mono text-sm">
-                      {selected.status === 'renamed'
-                        ? `${selected.oldPath} → ${selected.path}`
-                        : selected.path}
-                    </h2>
-                    <DiffStyleToggle />
+  const rows = visibleRows(tree, collapsed)
+
+  return (
+    <ResizablePanelGroup orientation="horizontal">
+      <ResizablePanel
+        defaultSize={`${width}px`}
+        minSize="160px"
+        maxSize="60%"
+        groupResizeBehavior="preserve-pixel-size"
+        onResize={(size) => {
+          if (size.inPixels > 0) localStorage.setItem(WIDTH_KEY, String(Math.round(size.inPixels)))
+        }}
+      >
+        <ScrollArea className="bg-sidebar/40 h-full">
+          <ul className="space-y-0.5 p-2" role="tree">
+            {rows.map((row, i) => {
+              const indent = { paddingLeft: `${0.5 + row.depth * 0.75}rem` }
+              if (row.kind === 'dir') {
+                const Chevron = row.open ? ChevronDown : ChevronRight
+                return (
+                  <li key={`d:${row.path}`} role="treeitem" aria-expanded={row.open}>
+                    <button
+                      onClick={() => toggle(row.path)}
+                      style={indent}
+                      className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left"
+                    >
+                      <Chevron className="size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate font-mono text-xs" title={row.path}>
+                        {row.name}
+                      </span>
+                    </button>
+                  </li>
+                )
+              }
+              const f = row.file
+              const Icon = f.binary ? Image : ICONS[f.status]
+              const s = fileStats(f)
+              const active = f.path === selected?.path
+              return (
+                <motion.li
+                  key={f.path}
+                  role="treeitem"
+                  aria-selected={active}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ ...spring, delay: Math.min(i * 0.015, 0.3) }}
+                >
+                  <button
+                    onClick={() => select(f)}
+                    style={indent}
+                    className={cn(
+                      'relative flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm',
+                      active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                      isNoise(f.path) && 'opacity-60',
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="file-active"
+                        transition={spring}
+                        className="bg-accent absolute inset-0 -z-10 rounded-md"
+                      />
+                    )}
+                    <Icon className="size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs" title={f.path}>
+                      {row.name}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] tabular-nums">
+                      <span className="text-emerald-400">+{s.additions}</span>{' '}
+                      <span className="text-rose-400">-{s.deletions}</span>
+                    </span>
+                  </button>
+                </motion.li>
+              )
+            })}
+          </ul>
+        </ScrollArea>
+      </ResizablePanel>
+      <ResizableHandle />
+
+      <ResizablePanel minSize="30%">
+        <div className="relative h-full min-w-0 overflow-hidden">
+          <AnimatePresence mode="popLayout" custom={direction} initial={false}>
+            {selected && (
+              <motion.div
+                key={selected.path}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="h-full"
+              >
+                <ScrollArea className="h-full">
+                  <div className="space-y-4 p-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <h2 className="truncate font-mono text-sm">
+                        {selected.status === 'renamed'
+                          ? `${selected.oldPath} → ${selected.path}`
+                          : selected.path}
+                      </h2>
+                      <DiffStyleToggle />
+                    </div>
+                    {selected.binary && (
+                      <p className="text-muted-foreground text-sm">
+                        This is a binary file. spiffy-diff does not show its diff.
+                      </p>
+                    )}
+                    {selected.hunks.map((h, i) => (
+                      <HunkBlock
+                        key={h.id}
+                        file={selected}
+                        hunkId={h.id}
+                        delay={i === 0 ? 120 : 120 + i * 40}
+                      />
+                    ))}
                   </div>
-                  {selected.binary && (
-                    <p className="text-muted-foreground text-sm">
-                      This is a binary file. spiffy-diff does not show its diff.
-                    </p>
-                  )}
-                  {selected.hunks.map((h, i) => (
-                    <HunkBlock
-                      key={h.id}
-                      file={selected}
-                      hunkId={h.id}
-                      delay={i === 0 ? 120 : 120 + i * 40}
-                    />
-                  ))}
-                </div>
-              </ScrollArea>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+                </ScrollArea>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   )
 }
 

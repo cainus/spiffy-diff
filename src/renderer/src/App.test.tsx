@@ -512,6 +512,20 @@ describe('the files view', () => {
 
     expect(await screen.findByRole('heading', { name: 'Wrap the call' })).toBeTruthy()
   })
+
+  it('shows the files in folders that you can close and open', async () => {
+    const user = await openPr()
+    await user.click(screen.getByRole('button', { name: 'files' }))
+
+    const folder = await screen.findByRole('button', { name: 'src' })
+    expect(screen.getByRole('button', { name: /retry\.ts/ })).toBeTruthy()
+
+    await user.click(folder)
+    expect(screen.queryByRole('button', { name: /retry\.ts/ })).toBeNull()
+
+    await user.click(folder)
+    expect(screen.getByRole('button', { name: /retry\.ts/ })).toBeTruthy()
+  })
 })
 
 describe('the source title', () => {

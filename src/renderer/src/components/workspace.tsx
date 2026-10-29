@@ -23,6 +23,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { arrowKey } from '@/lib/keys'
 import { sourceName } from '@/lib/source-name'
 import { useAgentToggle } from '@/lib/use-agent-toggle'
+import { fileTree, treeOrder } from '@/lib/file-tree'
 import { breadcrumbs, type NavState } from '@/lib/nav'
 import { spring } from '@/lib/motion'
 import { cn } from '@/lib/utils'
@@ -64,7 +65,7 @@ export function Workspace() {
         // Enter on a focused button clicks it. Leave that to the button.
         if (e.key === 'Enter' && e.target instanceof HTMLElement && e.target.closest('button, a'))
           return
-        const files = latest.current.source?.files.map((f) => f.path) ?? []
+        const files = treeOrder(fileTree(latest.current.source?.files ?? []))
         const action = arrowKey(latest.current.nav, latest.current.summary, files, e.key)
         if (!action) return
         e.preventDefault()
